@@ -75,27 +75,25 @@ const Icon = ({ children }) => (
 );
 
 const ICONS = {
-  altitude: <Icon><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></Icon>,
-  temperature: <Icon><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></Icon>,
-  pressure: <Icon><circle cx="12" cy="12" r="10"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="m4.93 4.93 2.83 2.83"/><path d="m16.24 16.24 2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="m4.93 19.07 2.83-2.83"/><path d="m16.24 7.76 2.83-2.83"/></Icon>,
-  speed: <Icon><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></Icon>,
   sun: <Icon><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></Icon>,
   moon: <Icon><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></Icon>,
 };
 
 // Mittarikortti: otsikko ikonilla, nykyarvo, valinnainen min/max-rivi ja kaavio.
-function MetricCard({ icon, title, value, unit, metaLabel, metaValue, history, dataKey, color, rangeMs, large = false, className }) {
+function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey, color, rangeMs, large = false, className }) {
   return (
     <div className={className ? `glass-card ${className}` : 'glass-card'}>
-      <h3 className="label">{icon}{title}</h3>
+      <div className="metric-head">
+        <h3 className="label">{title}</h3>
+        {metaLabel && (
+          <span className="metric-meta">
+            {metaLabel}<strong>{metaValue != null ? metaValue.toFixed(1) : '--'}</strong>{unit}
+          </span>
+        )}
+      </div>
       <p className={large ? 'value-large' : 'value-medium'}>
         {value?.toFixed(1) ?? '--'}<span className="unit">{unit}</span>
       </p>
-      {metaLabel && (
-        <div className="metric-meta">
-          {metaLabel} <strong>{metaValue != null ? metaValue.toFixed(1) : '--'}</strong> {unit}
-        </div>
-      )}
       <MetricChart history={history} dataKey={dataKey} unit={unit} color={color} rangeMs={rangeMs} />
     </div>
   );
@@ -154,7 +152,6 @@ function App() {
           <MetricCard
             className="altitude-section"
             large
-            icon={ICONS.altitude}
             title="Korkeus"
             value={telemetry?.gps_alt}
             unit="m"
@@ -168,7 +165,6 @@ function App() {
 
           <div className="metrics-row left-metrics">
             <MetricCard
-              icon={ICONS.temperature}
               title="Lämpötila"
               value={telemetry?.temp_c}
               unit="°C"
@@ -180,7 +176,6 @@ function App() {
               rangeMs={rangeMs}
             />
             <MetricCard
-              icon={ICONS.pressure}
               title="Ilmanpaine"
               value={telemetry?.pressure_hpa}
               unit="hPa"
@@ -202,7 +197,6 @@ function App() {
 
           <div className="metrics-row right-metrics">
             <MetricCard
-              icon={ICONS.speed}
               title="Nopeus"
               value={telemetry?.gps_speed}
               unit="m/s"

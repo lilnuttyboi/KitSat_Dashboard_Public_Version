@@ -1,15 +1,26 @@
 import { memo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const formatTimeLabel = (ms) => new Date(ms).toLocaleTimeString();
+const pad = (n) => String(n).padStart(2, '0');
+// 24 h muoto (HH:MM:SS) on lyhyempi kuin "5:54:44 PM", joten X-akselin
+// aikaleimat mahtuvat tasavälein eivätkä tungeksi tai harvene epätasaisesti.
+const formatTimeLabel = (ms) => {
+  const d = new Date(ms);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+// Y-arvot oikealla reunalla: oma kaista, jonka leveys riittää pisimmälle
+// leimalle (esim. "1006.3hPa"), joten ne eivät leikkaudu.
+const Y_AXIS_WIDTH = 88;
 
 const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", domain, ticks, yDomain, yTicks }) => {
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 30 }}>
-          {/* Viivojen värit tulevat App.css:stä (--chart-grid), joka ylikirjoittaa
-              rechartsin attribuutit — siksi tässä ei aseteta strokea. */}
+        {/* Vasen marginaali jättää tilaa keskitetylle ensimmäiselle aikaleimalle;
+            Y-arvot ovat oikealla omalla kaistallaan. Viivojen värit tulevat
+            App.css:stä (--chart-grid), joka ylikirjoittaa rechartsin attribuutit. */}
+        <LineChart data={data} margin={{ top: 10, right: 0, left: 36, bottom: 36 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={true} />
           <XAxis
             dataKey="rawTimeMs"
@@ -17,23 +28,25 @@ const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", do
             domain={domain ?? ['auto', 'auto']}
             ticks={ticks}
             scale="time"
+            interval="preserveStartEnd"
             tickFormatter={formatTimeLabel}
-            fontSize={13}
+            fontSize={16}
             tick={{ fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}
             axisLine={{ stroke: 'var(--border)' }}
             tickLine={false}
-            minTickGap={30}
-            dy={15}
+            minTickGap={24}
+            dy={16}
           />
           <YAxis
+            orientation="right"
             domain={yDomain ?? ['auto', 'auto']}
             ticks={yTicks}
-            fontSize={11}
-            tick={{ fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 500, textAnchor: 'start', dx: -54 }}
+            width={Y_AXIS_WIDTH}
+            fontSize={16}
+            tick={{ fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 500, textAnchor: 'start', dx: 4 }}
             axisLine={false}
             tickLine={false}
             tickFormatter={(value) => `${Number(value.toFixed(2))}${unit}`}
-            width={72}
           />
           <Tooltip
             labelStyle={{ color: 'var(--text-main)', fontWeight: 'bold', fontSize: '11px', marginBottom: '4px', fontFamily: 'var(--font-sans)' }}
@@ -50,13 +63,13 @@ const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", do
             labelFormatter={formatTimeLabel}
             formatter={(value) => [`${Number(value).toFixed(2)} ${unit}`, dataKey]}
           />
-          <Line 
-            type="monotone" 
-            dataKey={dataKey} 
-            stroke={color} 
-            strokeWidth={2} 
+          <Line
+            type="monotone"
+            dataKey={dataKey}
+            stroke={color}
+            strokeWidth={3}
             dot={false}
-            activeDot={{ r: 4, fill: color, stroke: 'var(--bg-color)', strokeWidth: 2 }}
+            activeDot={{ r: 5, fill: color, stroke: 'var(--bg-color)', strokeWidth: 2 }}
             isAnimationActive={false}
           />
         </LineChart>

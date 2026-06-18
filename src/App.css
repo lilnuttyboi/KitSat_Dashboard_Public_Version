@@ -213,18 +213,36 @@ body, html {
   grid-area: altitude;
 }
 
-.metric-meta {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  letter-spacing: 0.15em;
-  margin-top: 0.25rem;
+/* Otsikkorivi: nimi vasemmalle, MIN/MAX-arvo oikealle reunalle (saman
+   rivin yläkulmaan), välissä labelin oma erotinviiva. */
+.metric-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
+.metric-head .label {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.metric-meta {
+  font-family: var(--font-mono);
+  font-size: clamp(1rem, 1.15vw, 1.45rem);
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Arvo erottuu vain kirkkaammalla värillä — sama koko ja paksuus kuin
+   MIN/MAX-tekstillä ja yksiköllä, jotta rivi näyttää tasakokoiselta.
+   Kiinteä em-marginaali antaa yhtenäiset välit (JSX:stä poistettu välilyönnit). */
 .metric-meta strong {
   color: var(--text-main);
-  font-weight: 600;
-  margin: 0 0.3rem;
+  font-weight: 500;
+  margin: 0 0.3em;
 }
 
 .metric-chart {
@@ -361,7 +379,7 @@ body, html {
 /* Typography */
 .label {
   font-family: var(--font-display);
-  font-size: 0.75rem;
+  font-size: clamp(0.9rem, 1vw, 1.3rem);
   font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -413,11 +431,11 @@ body, html {
 }
 
 .value-large .unit {
-  font-size: 0.2em;
+  font-size: 0.4em;
 }
 
 .value-medium .unit {
-  font-size: 0.3em;
+  font-size: 0.46em;
 }
 
 /* Status Indicator */
@@ -564,6 +582,7 @@ body, html {
   .value-large { font-size: clamp(2.2rem, 4vw, 3.2rem); }
   .value-medium { font-size: clamp(1.4rem, 2.5vw, 2rem); }
   .label { margin-bottom: 0.25rem; }
+  .metric-head { margin-bottom: 0.25rem; }
   .metric-chart { margin-top: 0.6rem; }
 }
 
