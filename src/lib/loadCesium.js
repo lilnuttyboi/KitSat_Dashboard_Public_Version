@@ -33,8 +33,12 @@ export function loadCesium() {
     script.async = true;
     script.dataset.cesium = 'true';
     script.onload = () => {
-      if (window.Cesium) resolve(window.Cesium);
-      else reject(new Error('Cesium latautui mutta window.Cesium puuttuu'));
+      if (window.Cesium) {
+        resolve(window.Cesium);
+      } else {
+        cesiumPromise = null; // Salli uudelleenyritys jos Cesium puuttuu latauksen jälkeen.
+        reject(new Error('Cesium latautui mutta window.Cesium puuttuu'));
+      }
     };
     script.onerror = () => {
       cesiumPromise = null; // Salli uudelleenyritys CDN-virheen jälkeen.
