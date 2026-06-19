@@ -586,4 +586,55 @@ body, html {
   .metric-chart { margin-top: 0.6rem; }
 }
 
+/* ── 3D-kartta (Cesium) ───────────────────────────────────────────── */
+.globe-wrapper {
+  height: 100%;
+  width: 100%;
+  min-height: 300px;
+  position: relative;
+  border: 4px solid var(--bg-color); /* sama "inset"-kehys kuin 2D-kartalla */
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.globe-canvas {
+  height: 100%;
+  width: 100%;
+}
+
+/* Cesiumin oma widget täyttää containerin. */
+.globe-canvas .cesium-widget,
+.globe-canvas .cesium-widget canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Lataus-/virheilmoitus kartan päällä. */
+.globe-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+  background: rgba(4, 6, 15, 0.85);
+  color: #f1f5f9;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+  line-height: 1.6;
+  z-index: 500;
+}
+
+/* "Palauta näkymä" -nappi 3D-kartan alakulmassa. */
+.globe-reset-btn {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  z-index: 500;
+  background: rgba(4, 6, 15, 0.7);
+  backdrop-filter: blur(4px);
+}
+
 
