@@ -637,4 +637,17 @@ body, html {
   backdrop-filter: blur(4px);
 }
 
+/* Karttatyypin valitsin (2D/3D) kartan yläkulmassa — isot napit ison näytön
+   luettavuutta varten. .map-section on position:relative (glass-card). */
+.map-mode-toggle {
+  position: absolute;
+  top: 1.75rem;
+  right: 1.75rem;
+  z-index: 500;
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(4, 6, 15, 0.7);
+  backdrop-filter: blur(4px);
+  border-radius: 2px;
+}
 

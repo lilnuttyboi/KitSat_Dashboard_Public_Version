@@ -7,6 +7,7 @@ import './App.css';
 // Lazy-ladataan raskaat riippuvuudet (leaflet, recharts) omiin chunkkeihinsa,
 // jotta ensilatauksen nippu pienenee.
 const MapComponent = lazy(() => import('./components/MapComponent'));
+const Globe3D = lazy(() => import('./components/Globe3D'));
 const MetricChart = lazy(() => import('./components/MetricChart'));
 
 const RANGES = [
@@ -55,10 +56,8 @@ function useTheme() {
 }
 
 // Reitti on vain visuaalinen: harvennetaan tasavälein mutta pidetään viimeisin
-// piste mukana, jotta marker-jälki on ajan tasalla. Raakadata ei muutu.
-function buildRoute(history) {
-  const pts = [];
-  for (const h of history) if (h.fix && h.lat != null && h.lon != null) pts.push([h.lat, h.lon]);
+// piste mukana, jotta jälki on ajan tasalla. Raakadata ei muutu.
+function downsample(pts) {
   if (pts.length <= ROUTE_MAX_POINTS) return pts;
   const step = pts.length / ROUTE_MAX_POINTS;
   const out = [];
@@ -66,6 +65,24 @@ function buildRoute(history) {
   const last = pts[pts.length - 1];
   if (out[out.length - 1] !== last) out.push(last);
   return out;
+}
+
+// 2D-reitti Leaflet-kartalle: [lat, lon] -parit.
+function buildRoute(history) {
+  const pts = [];
+  for (const h of history) if (h.fix && h.lat != null && h.lon != null) pts.push([h.lat, h.lon]);
+  return downsample(pts);
+}
+
+// 3D-reitti Cesium-kartalle: sama suodatus + harvennus, mutta korkeus mukana.
+function buildRoute3d(history) {
+  const pts = [];
+  for (const h of history) {
+    if (h.fix && h.lat != null && h.lon != null) {
+      pts.push({ lat: h.lat, lon: h.lon, alt: Number.isFinite(h.alt) ? h.alt : 0 });
+    }
+  }
+  return downsample(pts);
 }
 
 const Icon = ({ children }) => (
@@ -103,7 +120,9 @@ function App() {
   const { telemetry, history, loading, status, maxAlt, minTemp, maxSpeed, flightStartMs, lastDataMs } = useTelemetry();
   const [rangeMs, setRangeMs] = useState(60_000);
   const [theme, toggleTheme] = useTheme();
+  const [mapMode, setMapMode] = useState('3d'); // '3d' = oletus (näyttävin yleisölle)
   const route = useMemo(() => buildRoute(history), [history]);
+  const route3d = useMemo(() => buildRoute3d(history), [history]);
 
   if (loading) {
     return <div className="loading">YHDISTETÄÄN OHJAUSKESKUKSEEN...</div>;
@@ -187,12 +206,41 @@ function App() {
           </div>
 
           <div className="glass-card map-section">
-            <MapComponent
-              lat={telemetry?.gps_fix ? telemetry.gps_lat : null}
-              lng={telemetry?.gps_fix ? telemetry.gps_lon : null}
-              route={route}
-              theme={theme}
-            />
+            {/* Karttatyypin valitsin pysyy näkyvissä molemmissa tiloissa, joten
+                se renderöidään tässä — ei Globe3D:n sisällä, joka unmountataan
+                kun 2D-kartta on valittuna. */}
+            <div className="map-mode-toggle">
+              <button
+                className={`range-btn${mapMode === '3d' ? ' active' : ''}`}
+                onClick={() => setMapMode('3d')}
+              >
+                3D
+              </button>
+              <button
+                className={`range-btn${mapMode === '2d' ? ' active' : ''}`}
+                onClick={() => setMapMode('2d')}
+              >
+                2D
+              </button>
+            </div>
+            <Suspense fallback={<div className="globe-overlay">LADATAAN KARTTAA…</div>}>
+              {mapMode === '3d' ? (
+                <Globe3D
+                  lat={telemetry?.gps_fix ? telemetry.gps_lat : null}
+                  lng={telemetry?.gps_fix ? telemetry.gps_lon : null}
+                  alt={telemetry?.gps_fix ? telemetry.gps_alt : null}
+                  route3d={route3d}
+                  theme={theme}
+                />
+              ) : (
+                <MapComponent
+                  lat={telemetry?.gps_fix ? telemetry.gps_lat : null}
+                  lng={telemetry?.gps_fix ? telemetry.gps_lon : null}
+                  route={route}
+                  theme={theme}
+                />
+              )}
+            </Suspense>
           </div>
 
           <div className="metrics-row right-metrics">
