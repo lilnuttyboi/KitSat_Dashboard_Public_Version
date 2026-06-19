@@ -154,16 +154,17 @@ function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark' }) {
 
         // Sivunäkymän seuranta: joka ruudulla kamera asetetaan kiinteään
         // sivukulmaan satelliitin ympärille (ei pyöri → "drone" seuraa sivusta).
+        // HeadingPitchRange luodaan kerran ja vain sen range päivittyy korkeuden
+        // mukana — vältetään olion luonti joka ruudulla (GC-paine).
+        const trackHpr = new Cesium.HeadingPitchRange(
+          Cesium.Math.toRadians(VIEW_HEADING_DEG),
+          Cesium.Math.toRadians(VIEW_PITCH_DEG),
+          VIEW_BASE_RANGE
+        );
         viewer.scene.preRender.addEventListener(() => {
           if (!autoTrackRef.current || !craftPosRef.current) return;
-          viewer.camera.lookAt(
-            craftPosRef.current,
-            new Cesium.HeadingPitchRange(
-              Cesium.Math.toRadians(VIEW_HEADING_DEG),
-              Cesium.Math.toRadians(VIEW_PITCH_DEG),
-              viewRange(altRef.current)
-            )
-          );
+          trackHpr.range = viewRange(altRef.current);
+          viewer.camera.lookAt(craftPosRef.current, trackHpr);
         });
 
         // Kun käyttäjä koskee karttaan, seuranta lopetetaan (ei taistella vastaan).
