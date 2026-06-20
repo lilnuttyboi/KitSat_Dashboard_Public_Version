@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useTelemetry } from './hooks/useTelemetry';
 import LatestImage from './components/LatestImage';
 import FlightTimer from './components/FlightTimer';
+import ControlPanel from './components/ControlPanel';
 import './App.css';
 
 // Lazy-ladataan raskaat riippuvuudet (leaflet, recharts) omiin chunkkeihinsa,
@@ -121,10 +122,11 @@ function App() {
   const [rangeMs, setRangeMs] = useState(60_000);
   const [theme, toggleTheme] = useTheme();
   const [mapMode, setMapMode] = useState('3d'); // '3d' = oletus (näyttävin yleisölle)
-  const [basemap] = useState('satellite'); // pohjakartta 2D-kartalle; asetus lisätään myöhemmin
-  const [cameraMode] = useState('sivu');   // 3D-kameran tila: 'sivu' | 'kierto' | 'ylha'
-  const [resetNonce] = useState(0);        // bump -> Globe3D kehystää uudelleen
-  const [flyoverNonce] = useState(0);      // bump -> Globe3D lentää reitin yli
+  const [basemap, setBasemap] = useState('satellite');   // 'satellite' | 'kartta'
+  const [cameraMode, setCameraMode] = useState('sivu');  // 'sivu' | 'kierto' | 'ylha'
+  const [resetNonce, setResetNonce] = useState(0);       // bump -> Globe3D kehystää uudelleen
+  const [flyoverNonce, setFlyoverNonce] = useState(0);   // bump -> Globe3D lentää reitin yli
+  const [panelOpen, setPanelOpen] = useState(true);      // ohjauspaneelin näkyvyys
   const route = useMemo(() => buildRoute(history), [history]);
   const route3d = useMemo(() => buildRoute3d(history), [history]);
 
@@ -133,6 +135,7 @@ function App() {
   }
 
   return (
+    <>
     <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="header-left">
@@ -278,6 +281,28 @@ function App() {
         </Suspense>
       </main>
     </div>
+    {panelOpen ? (
+      <ControlPanel
+        basemap={basemap}
+        onBasemapChange={setBasemap}
+        cameraMode={cameraMode}
+        onCameraModeChange={setCameraMode}
+        onReset={() => setResetNonce((n) => n + 1)}
+        onFlyover={() => setFlyoverNonce((n) => n + 1)}
+        mapMode={mapMode}
+        onClose={() => setPanelOpen(false)}
+      />
+    ) : (
+      <button
+        className="control-launcher"
+        onClick={() => setPanelOpen(true)}
+        aria-label="Avaa ohjauspaneeli"
+        title="Avaa ohjauspaneeli"
+      >
+        ⚙
+      </button>
+    )}
+    </>
   );
 }
 

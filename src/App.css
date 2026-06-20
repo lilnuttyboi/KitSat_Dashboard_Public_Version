@@ -651,3 +651,131 @@ body, html {
   border-radius: 2px;
 }
 
+/* ── Ohjauspaneeli (kelluva, raahattava ikkuna) ────────────────────────
+   Aina tumma pohja (kuten yläpalkki), joten värit kovakoodataan eikä
+   sidota teemamuuttujiin (jotka vaalealla muuttuisivat mustiksi). */
+.control-window {
+  position: fixed;
+  z-index: 2000;
+  width: 240px;
+  background: rgba(11, 15, 26, 0.92);
+  backdrop-filter: var(--glass);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  box-shadow: var(--shadow-lg);
+  color: #f1f5f9;
+  user-select: none;
+}
+.control-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: move;
+  touch-action: none; /* salli vetely myös kosketuksella */
+}
+.control-title {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+.control-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+.control-close:hover {
+  color: #fff;
+}
+.control-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.control-section.disabled {
+  opacity: 0.5;
+}
+.control-label {
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.control-row .range-btn {
+  flex: 1;
+}
+.control-wide {
+  width: 100%;
+}
+.control-hint {
+  font-family: var(--font-sans);
+  font-size: 0.65rem;
+  line-height: 1.4;
+  color: #94a3b8;
+}
+
+/* Paneelin napit tummalla pohjalla — kirkkaat värit molemmissa teemoissa. */
+.control-window .range-btn {
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.control-window .range-btn:hover {
+  color: #fff;
+  border-color: #fff;
+}
+.control-window .range-btn.active {
+  color: #fbbf24;
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+}
+.control-window .range-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.control-window .range-btn:disabled:hover {
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Avausnappi kun paneeli on piilotettu. */
+.control-launcher {
+  position: fixed;
+  top: 88px;
+  right: 24px;
+  z-index: 2000;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  background: rgba(11, 15, 26, 0.92);
+  backdrop-filter: var(--glass);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  color: #f1f5f9;
+  cursor: pointer;
+}
+.control-launcher:hover {
+  border-color: #fff;
+}
+

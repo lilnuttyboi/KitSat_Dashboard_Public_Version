@@ -383,15 +383,6 @@ function Globe3D({
           KÄYTÄ 2D-KARTTAA.
         </div>
       )}
-      {status === 'ready' && (
-        <button
-          className="range-btn globe-reset-btn"
-          onClick={flyToCurrentPose}
-          title="Palauta seuraava sivunäkymä"
-        >
-          Palauta näkymä
-        </button>
-      )}
     </div>
   );
 }
