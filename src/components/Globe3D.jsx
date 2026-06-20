@@ -90,6 +90,8 @@ function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark', basemap = 'satel
   const positionsRef = useRef([]);      // Cesium.Cartesian3[]
   const craftPosRef = useRef(null);     // Cesium.Cartesian3 | null
   const altRef = useRef(0);             // viimeisin korkeus kameran etäisyyttä varten
+  const basemapRef = useRef(basemap); // tuorein pohjakartta async-alustusta varten
+  const themeRef = useRef(theme);     // tuorein teema async-alustusta varten
   const autoTrackRef = useRef(false);   // seuraako kamera satelliittia
   const didFirstFlyRef = useRef(false);
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
@@ -144,7 +146,7 @@ function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark', basemap = 'satel
         });
         viewerRef.current = viewer;
 
-        applyBasemap(Cesium, viewer, basemap, theme);
+        applyBasemap(Cesium, viewer, basemapRef.current, themeRef.current);
 
         viewer.scene.globe.depthTestAgainstTerrain = false;
         viewer.cesiumWidget.creditContainer.style.display = 'none';
@@ -221,9 +223,6 @@ function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark', basemap = 'satel
       if (viewer && !viewer.isDestroyed()) viewer.destroy();
       viewerRef.current = null;
     };
-    // theme luetaan tarkoituksella vain alustuksessa; teemavaihto hoidetaan
-    // erillisessä efektissä alla.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Päivitä lentorata kun route3d muuttuu (vasta kun viewer on valmis).
@@ -256,6 +255,12 @@ function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark', basemap = 'satel
       flyToSidePose();
     }
   }, [lat, lng, alt, status, flyToSidePose]);
+
+  // Pidä refit ajan tasalla, jotta Cesiumin async-alustus käyttää tuoreimpia arvoja.
+  useEffect(() => {
+    basemapRef.current = basemap;
+    themeRef.current = theme;
+  }, [basemap, theme]);
 
   // Vaihda pohjakartta tai teema.
   useEffect(() => {
