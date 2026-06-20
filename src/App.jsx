@@ -121,6 +121,7 @@ function App() {
   const [rangeMs, setRangeMs] = useState(60_000);
   const [theme, toggleTheme] = useTheme();
   const [mapMode, setMapMode] = useState('3d'); // '3d' = oletus (näyttävin yleisölle)
+  const [basemap] = useState('satellite'); // pohjakartta 2D-kartalle; asetus lisätään myöhemmin
   const route = useMemo(() => buildRoute(history), [history]);
   const route3d = useMemo(() => buildRoute3d(history), [history]);
 
@@ -244,6 +245,7 @@ function App() {
                   lng={telemetry?.gps_fix ? telemetry.gps_lon : null}
                   route={route}
                   theme={theme}
+                  basemap={basemap}
                 />
               )}
             </Suspense>

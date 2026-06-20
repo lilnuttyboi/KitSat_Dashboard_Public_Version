@@ -332,6 +332,11 @@ body, html {
   filter: none;
 }
 
+/* Satelliittipohjalla kirkastussuodatin ei sovi — kuvat ovat jo täysivärisiä. */
+.map-wrapper--satellite .leaflet-container .leaflet-tile-pane {
+  filter: none;
+}
+
 .balloon-marker {
   background: transparent;
   border: none;

@@ -35,6 +35,13 @@ const TILE_URLS = {
   light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
 };
 
+// Satelliittipohjakartta: Esri World Imagery (ei vaadi API-avainta) +
+// nimistökerros päälle luettavuuden vuoksi.
+const ESRI_SATELLITE_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const ESRI_LABELS_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
+
 function MapEffects({ lat, lng }) {
   const map = useMap();
   useEffect(() => {
@@ -50,7 +57,7 @@ function MapEffects({ lat, lng }) {
   return null;
 }
 
-const MapComponent = memo(({ lat, lng, route = [], theme = 'dark' }) => {
+const MapComponent = memo(({ lat, lng, route = [], theme = 'dark', basemap = 'satellite' }) => {
   const hasValidCoords = lat != null && lng != null;
   // Keskipiste kiinnitetään mount-hetkellä: MapContainer ei seuraa center-propin
   // muutoksia, vaan näkymää siirtää MapEffects.
@@ -59,19 +66,39 @@ const MapComponent = memo(({ lat, lng, route = [], theme = 'dark' }) => {
   const showRoute = route.length >= 2;
 
   return (
-    <div className="map-wrapper">
+    <div className={`map-wrapper${basemap === 'satellite' ? ' map-wrapper--satellite' : ''}`}>
       <MapContainer
         center={initialCenter}
         zoom={13}
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%' }}
       >
-        <TileLayer
-          key={theme}
-          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url={TILE_URLS[theme] ?? TILE_URLS.dark}
-          subdomains="abcd"
-        />
+        {basemap === 'satellite' ? (
+          <>
+            {/* Esri World Imagery — ei vaadi API-avainta */}
+            <TileLayer
+              key="satellite"
+              attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+              url={ESRI_SATELLITE_URL}
+              maxZoom={19}
+            />
+            {/* Nimistö ja rajat satelliitin päälle */}
+            <TileLayer
+              key="satellite-labels"
+              attribution=''
+              url={ESRI_LABELS_URL}
+              maxZoom={19}
+              opacity={0.8}
+            />
+          </>
+        ) : (
+          <TileLayer
+            key={theme}
+            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url={TILE_URLS[theme] ?? TILE_URLS.dark}
+            subdomains="abcd"
+          />
+        )}
         {showRoute && (
           <Polyline
             positions={route}
