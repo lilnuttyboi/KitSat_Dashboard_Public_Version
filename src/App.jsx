@@ -122,6 +122,9 @@ function App() {
   const [theme, toggleTheme] = useTheme();
   const [mapMode, setMapMode] = useState('3d'); // '3d' = oletus (näyttävin yleisölle)
   const [basemap] = useState('satellite'); // pohjakartta 2D-kartalle; asetus lisätään myöhemmin
+  const [cameraMode] = useState('sivu');   // 3D-kameran tila: 'sivu' | 'kierto' | 'ylha'
+  const [resetNonce] = useState(0);        // bump -> Globe3D kehystää uudelleen
+  const [flyoverNonce] = useState(0);      // bump -> Globe3D lentää reitin yli
   const route = useMemo(() => buildRoute(history), [history]);
   const route3d = useMemo(() => buildRoute3d(history), [history]);
 
@@ -239,6 +242,9 @@ function App() {
                   route3d={route3d}
                   theme={theme}
                   basemap={basemap}
+                  cameraMode={cameraMode}
+                  resetNonce={resetNonce}
+                  flyoverNonce={flyoverNonce}
                 />
               ) : (
                 <MapComponent
