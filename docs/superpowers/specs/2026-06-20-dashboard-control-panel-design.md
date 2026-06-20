@@ -8,7 +8,9 @@
 Add a hide-able floating **control window** to the public dashboard that steers the
 map: switch the basemap to realistic **satellite imagery**, pick a **cinematic camera
 mode** (all tracking the satellite), and reset the view — moving the reset action out
-of the map itself.
+of the map itself. The window also flips a one-click **maintenance mode** that covers
+the whole public dashboard with a branded Pori Space Lab splash, so the operator can
+hide it instantly while fixing something and unhide it just as fast.
 
 ## Architecture (one sentence each)
 
@@ -78,7 +80,10 @@ dependencies.
 - **Kamera** section: three mode buttons — `Sivu` | `Kierto` | `Ylhäältä` — plus a
   separate **`Lento`** action button. This whole section is **disabled / greyed when
   `mapMode === '2d'`** (camera modes are 3D-only); a short Finnish note explains why.
-- **`Palauta näkymä`** button (full-width) at the bottom.
+- **`Palauta näkymä`** button (full-width).
+- **Huolto** section: a **`Huoltotila`** toggle button (active/highlighted when on).
+  Turning it on shows the maintenance splash over the whole dashboard (Feature 4);
+  turning it off restores the dashboard. This is the operator's hide/unhide switch.
 
 ### Props
 ```
@@ -89,6 +94,8 @@ ControlPanel({
   onCameraModeChange, // (value) => void
   onReset,            // () => void   -> bumps resetNonce in App
   onFlyover,          // () => void   -> bumps flyoverNonce in App
+  maintenance,        // boolean      -> highlights the Huoltotila toggle
+  onMaintenanceToggle,// () => void   -> App flips maintenance
   mapMode,            // '3d' | '2d'  -> disables camera section in 2d
   onClose,            // () => void   -> App sets panelOpen=false
 })
@@ -183,6 +190,35 @@ FLYOVER_DURATION    = 4.0  // seconds
 
 ---
 
+## Feature 4 — Maintenance mode ("hide the dashboard")
+
+### Behavior
+- New component **`src/components/MaintenanceOverlay.jsx`**: a full-viewport
+  `position: fixed` splash that covers the entire dashboard (header + grid + map
+  overlays) when `maintenance` is true. The dashboard keeps running underneath
+  (data still updates); it is only visually covered — nothing is paused.
+- Toggled from the control window's **Huoltotila** button (`maintenance` state in
+  `App`, default `false`).
+- **The control window and the ⚙ launcher sit *above* the maintenance splash** so the
+  operator can always toggle it back off. Layering (z-index):
+  dashboard/header (≤ 10) < map overlays (≤ 500) < maintenance splash (`1500`) <
+  control window + launcher (`2000`). Consistent with the earlier decision that the
+  control window is public.
+
+### Look & copy (Finnish, dark/space-themed regardless of UI theme)
+- Centered, dark space-themed background (matches the app's `--bg-color` / starfield
+  feel); always dark like the header, even in light theme.
+- **Logo:** the text `PORI SPACE LAB` rendered in the **display font** used by the main
+  values (`--font-display`, Orbitron) — large (clamp sizing like `.value-large`),
+  bright, wide letter-spacing. Plain text, no image asset.
+- **Status line (Finnish):** `Huoltotauko käynnissä`.
+- **Funny subtitle (Finnish):** `Ruuvataan vielä pari pulttia kiinni — palaamme pian.`
+- A subtle touch (e.g., a slowly spinning ⚙ or a pulsing dot) is allowed for life;
+  keep it lightweight. The three strings are isolated constants at the top of the
+  component so they are trivial to edit later.
+
+---
+
 ## State & Data Flow (`App.jsx`)
 
 New state in `App`:
@@ -192,7 +228,10 @@ const [cameraMode, setCameraMode] = useState('sivu');
 const [resetNonce, setResetNonce]   = useState(0);  // bump -> Globe3D re-frames
 const [flyoverNonce, setFlyoverNonce] = useState(0); // bump -> Globe3D fly-over
 const [panelOpen, setPanelOpen]   = useState(true);
+const [maintenance, setMaintenance] = useState(false); // huoltotila: peittää näkymän
 ```
+- `MaintenanceOverlay` renders at `App` top level (sibling of the control window),
+  shown only when `maintenance` is true.
 - `Globe3D` gains props: `basemap`, `cameraMode`, `resetNonce`, `flyoverNonce`
   (plus existing `lat/lng/alt/route3d/theme`).
 - `MapComponent` gains prop: `basemap`.
@@ -211,14 +250,17 @@ Deliberate **YAGNI / non-goals**:
 ## Files
 
 - **Create:** `src/components/ControlPanel.jsx` — the floating window + drag logic.
-- **Modify:** `src/App.jsx` — new state, render `ControlPanel` + launcher, pass props.
+- **Create:** `src/components/MaintenanceOverlay.jsx` — the Pori Space Lab splash.
+- **Modify:** `src/App.jsx` — new state (incl. `maintenance`), render `ControlPanel`
+  + launcher + `MaintenanceOverlay`, pass props.
 - **Modify:** `src/components/Globe3D.jsx` — basemap construction, `cameraMode`
   branching in `preRender`, `resetNonce` / `flyoverNonce` effects, remove in-globe
   reset button.
 - **Modify:** `src/components/MapComponent.jsx` — `basemap` prop, Esri satellite +
   labels layers, wrapper class for brightness scoping.
-- **Modify:** `src/App.css` — `.control-window*`, `.control-launcher` styles;
-  scope the dark-tile brightness filter to the styled basemap only.
+- **Modify:** `src/App.css` — `.control-window*`, `.control-launcher`,
+  `.maintenance-overlay*` styles; scope the dark-tile brightness filter to the styled
+  basemap only.
 
 ## Verification
 
@@ -226,4 +268,6 @@ Deliberate **YAGNI / non-goals**:
 - Manual (handed to user): window drags/hides/reopens and persists position;
   satellite shows real forests/water in 2D and 3D and is the default; "Kartta" switches
   back; each camera mode tracks the satellite; "Lento" sweeps then resumes; "Palauta
-  näkymä" re-frames; camera section greys out in 2D.
+  näkymä" re-frames; camera section greys out in 2D; **Huoltotila** covers the whole
+  dashboard with the Pori Space Lab splash and the control window stays on top to
+  toggle it back off.
