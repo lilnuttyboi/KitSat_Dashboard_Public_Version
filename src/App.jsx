@@ -238,6 +238,7 @@ function App() {
                   alt={telemetry?.gps_fix ? telemetry.gps_alt : null}
                   route3d={route3d}
                   theme={theme}
+                  basemap={basemap}
                 />
               ) : (
                 <MapComponent

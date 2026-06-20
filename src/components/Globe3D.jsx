@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadCesium } from '../lib/loadCesium';
 
-// CARTO-karttapohja teeman mukaan — sama lähde kuin 2D-kartalla. Cesium ei tue
-// {r}-retina-merkintää, joten se jätetään pois.
+// "Kartta"-pohja: teemoitetut CARTO-tiilet. Cesium ei tue {r}-merkintää.
 const CARTO_URLS = {
   dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
   light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
 };
+
+// "Satelliitti"-pohja: Esri World Imagery (tokeniton) + ohut paikannimikerros.
+const SATELLITE_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const SATELLITE_LABELS_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
+const ESRI_CREDIT = 'Esri, Maxar, Earthstar Geographics, and the GIS User Community';
 
 const ROUTE_COLOR = '#fbbf24'; // sama keltainen kuin 2D-reitti / korkeuskäyrä
 const CRAFT_COLOR = '#35d6e6'; // satelliittipisteen syaani
@@ -24,22 +30,47 @@ function viewRange(altMeters) {
   return VIEW_BASE_RANGE + (Number.isFinite(altMeters) ? altMeters : 0) * 2.2;
 }
 
-// Rakentaa teeman mukaisen CARTO-kuvakerroksen.
-function cartoLayer(Cesium, theme) {
-  const provider = new Cesium.UrlTemplateImageryProvider({
-    url: CARTO_URLS[theme] ?? CARTO_URLS.dark,
-    subdomains: 'abcd',
-    credit: '© CARTO © OpenStreetMap contributors',
-    maximumLevel: 19,
-  });
-  const layer = new Cesium.ImageryLayer(provider);
-  // Tumma CARTO on lähes musta — kirkastetaan kuten 2D-kartalla CSS:llä.
+// Rakentaa valitun pohjakartan kuvakerrokset. Satelliitti = kuva + nimikerros
+// (ei kirkastusta, oikea valotus); kartta = teemoitettu CARTO (tumma kirkastetaan).
+function buildBasemapLayers(Cesium, basemap, theme) {
+  if (basemap === 'satellite') {
+    const imagery = new Cesium.ImageryLayer(
+      new Cesium.UrlTemplateImageryProvider({
+        url: SATELLITE_URL,
+        maximumLevel: 19,
+        credit: ESRI_CREDIT,
+      })
+    );
+    const labels = new Cesium.ImageryLayer(
+      new Cesium.UrlTemplateImageryProvider({
+        url: SATELLITE_LABELS_URL,
+        maximumLevel: 19,
+      })
+    );
+    return [imagery, labels];
+  }
+  const layer = new Cesium.ImageryLayer(
+    new Cesium.UrlTemplateImageryProvider({
+      url: CARTO_URLS[theme] ?? CARTO_URLS.dark,
+      subdomains: 'abcd',
+      credit: '© CARTO © OpenStreetMap contributors',
+      maximumLevel: 19,
+    })
+  );
   if (theme === 'dark') {
     layer.brightness = 2.0;
     layer.contrast = 1.1;
     layer.saturation = 1.3;
   }
-  return layer;
+  return [layer];
+}
+
+// Vaihtaa näkyvät kuvakerrokset valitun pohjakartan mukaan.
+function applyBasemap(Cesium, viewer, basemap, theme) {
+  viewer.imageryLayers.removeAll(true);
+  for (const layer of buildBasemapLayers(Cesium, basemap, theme)) {
+    viewer.imageryLayers.add(layer);
+  }
 }
 
 // Muuntaa reittipisteet Cartesian3-taulukoksi.
@@ -51,7 +82,7 @@ function toCartesians(Cesium, route3d) {
     );
 }
 
-function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark' }) {
+function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark', basemap = 'satellite' }) {
   const containerRef = useRef(null);
   const cesiumRef = useRef(null);       // window.Cesium
   const viewerRef = useRef(null);
@@ -98,8 +129,8 @@ function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark' }) {
         cesiumRef.current = Cesium;
 
         const viewer = new Cesium.Viewer(containerRef.current, {
-          // Tokeniton: oma CARTO-kuvakerros, ei Ion-maailmankuvaa eikä maastoa.
-          baseLayer: cartoLayer(Cesium, theme),
+          // Tokeniton: oma kuvakerros (satelliitti tai CARTO), ei Ion-oletusta.
+          baseLayer: false,
           baseLayerPicker: false,
           geocoder: false,
           homeButton: false,
@@ -112,6 +143,8 @@ function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark' }) {
           selectionIndicator: false,
         });
         viewerRef.current = viewer;
+
+        applyBasemap(Cesium, viewer, basemap, theme);
 
         viewer.scene.globe.depthTestAgainstTerrain = false;
         viewer.cesiumWidget.creditContainer.style.display = 'none';
@@ -224,14 +257,13 @@ function Globe3D({ lat, lng, alt, route3d = [], theme = 'dark' }) {
     }
   }, [lat, lng, alt, status, flyToSidePose]);
 
-  // Vaihda karttapohja teeman mukaan.
+  // Vaihda pohjakartta tai teema.
   useEffect(() => {
     const Cesium = cesiumRef.current;
     const viewer = viewerRef.current;
     if (!Cesium || !viewer || viewer.isDestroyed() || status !== 'ready') return;
-    viewer.imageryLayers.removeAll(true);
-    viewer.imageryLayers.add(cartoLayer(Cesium, theme));
-  }, [theme, status]);
+    applyBasemap(Cesium, viewer, basemap, theme);
+  }, [basemap, theme, status]);
 
   return (
     <div className="globe-wrapper">
