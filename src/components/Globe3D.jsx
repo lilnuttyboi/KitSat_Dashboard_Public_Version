@@ -16,7 +16,7 @@ const GROUND_CLAMP_LIMIT = 150; // m — tämän alapuolella dotti naulataan maa
 // Kamerakulmat asteina (Cesium.Math ei ole käytettävissä moduulin latautuessa,
 // joten muunnos radiaaneiksi tehdään vasta käyttökohdassa). Säädä makuun.
 const VIEW_HEADING_DEG = 35;   // sivukulma
-const VIEW_PITCH_DEG = -12;    // hieman alaspäin
+const VIEW_PITCH_DEG = -4;     // loiva alaspäin: kamera matalalla, horisontti hyvin esillä
 const VIEW_BASE_RANGE = 4000;  // m, vähimmäisetäisyys kohteeseen
 
 // Kameran etäisyys kasvaa korkeuden mukana, jotta koko korkeusverho pysyy kuvassa.

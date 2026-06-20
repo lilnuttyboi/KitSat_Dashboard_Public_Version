@@ -9,18 +9,41 @@ const formatTimeLabel = (ms) => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
-// Y-arvot oikealla reunalla: oma kaista, jonka leveys riittää pisimmälle
-// leimalle (esim. "1006.3hPa"), joten ne eivät leikkaudu.
-const Y_AXIS_WIDTH = 88;
+// X-akselin aikaleima: kun kaavio on tasattu vasempaan reunaan (margin.left = 0),
+// keskitetty ensimmäinen leima leikkautuisi kortin reunan yli. Siksi ensimmäinen
+// leima tasataan vasemmalle ja viimeinen oikealle, väliset keskitetään.
+function XTick({ x, y, payload, index, visibleTicksCount }) {
+  const anchor = index === 0 ? 'start' : index === visibleTicksCount - 1 ? 'end' : 'middle';
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={16}
+        textAnchor={anchor}
+        style={{ fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 16 }}
+      >
+        {formatTimeLabel(payload.value)}
+      </text>
+    </g>
+  );
+}
 
-const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", domain, ticks, yDomain, yTicks }) => {
+const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", domain, ticks, yDomain, yTicks, yScale = 1, yUnit, yDecimals = 2 }) => {
+  // Kaavion arvoyksikkö voi poiketa päämittarista (ilmanpaine: hPa → kPa).
+  // Y-akselin leimat on piilotettu, joten yksikköä käytetään enää tooltipissa.
+  const axisUnit = yUnit ?? unit;
+
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
-        {/* Vasen marginaali jättää tilaa keskitetylle ensimmäiselle aikaleimalle;
-            Y-arvot ovat oikealla omalla kaistallaan. Viivojen värit tulevat
-            App.css:stä (--chart-grid), joka ylikirjoittaa rechartsin attribuutit. */}
-        <LineChart data={data} margin={{ top: 10, right: 0, left: 36, bottom: 36 }}>
+        {/* Kaavio täyttää koko kortin leveyden: ei Y-akselin kaistaa, joten
+            viiva alkaa vasemmasta reunasta ja päättyy oikeaan (margin 0 molemmin
+            puolin). Y-akseli on piilotettu, mutta sen domain skaalaa viivan ja
+            sen pykälät asettavat vaaka-apuviivat. Reuna-aikaleimat tasataan
+            XTickissä sisäänpäin, etteivät ne leikkaudu. Apuviivojen värit
+            tulevat App.css:stä (--chart-grid). */}
+        <LineChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 36 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={true} />
           <XAxis
             dataKey="rawTimeMs"
@@ -28,25 +51,15 @@ const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", do
             domain={domain ?? ['auto', 'auto']}
             ticks={ticks}
             scale="time"
-            interval="preserveStartEnd"
-            tickFormatter={formatTimeLabel}
-            fontSize={16}
-            tick={{ fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}
+            interval={0}
+            tick={<XTick />}
             axisLine={{ stroke: 'var(--border)' }}
             tickLine={false}
-            minTickGap={24}
-            dy={16}
           />
           <YAxis
-            orientation="right"
             domain={yDomain ?? ['auto', 'auto']}
             ticks={yTicks}
-            width={Y_AXIS_WIDTH}
-            fontSize={16}
-            tick={{ fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 500, textAnchor: 'start', dx: 4 }}
-            axisLine={false}
-            tickLine={false}
-            tickFormatter={(value) => `${Number(value.toFixed(2))}${unit}`}
+            hide
           />
           <Tooltip
             labelStyle={{ color: 'var(--text-main)', fontWeight: 'bold', fontSize: '11px', marginBottom: '4px', fontFamily: 'var(--font-sans)' }}
@@ -61,7 +74,7 @@ const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", do
             itemStyle={{ color: color, fontSize: '11px', fontFamily: 'var(--font-mono)' }}
             cursor={{ strokeWidth: 1 }}
             labelFormatter={formatTimeLabel}
-            formatter={(value) => [`${Number(value).toFixed(2)} ${unit}`, dataKey]}
+            formatter={(value) => [`${(value / yScale).toFixed(yDecimals)} ${axisUnit}`, dataKey]}
           />
           <Line
             type="monotone"

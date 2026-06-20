@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import TelemetryChart from './TelemetryChart';
 
 const CHART_MAX_POINTS = 2000;
-const TICK_COUNT = 5; // X-akselin aikaleimojen määrä (pariton → symmetrinen harvennus)
+const TICK_COUNT = 3; // X-akselin aikaleimat: alku, keskikohta, loppu — sama määrä joka kaaviossa, tasaisin välein
 
 // Harvennetaan vain kaaviolle: säilytetään kunkin bucketin min ja max (piikit
 // eivät katoa) ja pidetään aikajärjestys. Raakadata ei muutu tämän ulkopuolella.
@@ -60,7 +60,7 @@ function computeYAxis(data, key) {
   return { yDomain: [Number(lo.toFixed(6)), Number(hi.toFixed(6))], yTicks };
 }
 
-export default function MetricChart({ history, dataKey, unit, color, rangeMs }) {
+export default function MetricChart({ history, dataKey, unit, color, rangeMs, yUnit, yScale, yDecimals }) {
   const { data, domain, ticks, yDomain, yTicks } = useMemo(() => {
     if (history.length === 0) return { data: history, domain: undefined, ticks: undefined, yDomain: undefined, yTicks: undefined };
     const firstMs = history[0].rawTimeMs;
@@ -94,7 +94,7 @@ export default function MetricChart({ history, dataKey, unit, color, rangeMs }) 
   return (
     <div className="metric-chart">
       <div className="metric-chart-canvas">
-        <TelemetryChart data={data} dataKey={dataKey} unit={unit} color={color} domain={domain} ticks={ticks} yDomain={yDomain} yTicks={yTicks} />
+        <TelemetryChart data={data} dataKey={dataKey} unit={unit} color={color} domain={domain} ticks={ticks} yDomain={yDomain} yTicks={yTicks} yScale={yScale} yUnit={yUnit} yDecimals={yDecimals} />
       </div>
     </div>
   );

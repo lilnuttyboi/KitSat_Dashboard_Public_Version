@@ -97,7 +97,7 @@ const ICONS = {
 };
 
 // Mittarikortti: otsikko ikonilla, nykyarvo, valinnainen min/max-rivi ja kaavio.
-function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey, color, rangeMs, large = false, className }) {
+function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey, color, rangeMs, large = false, className, yUnit, yScale, yDecimals }) {
   return (
     <div className={className ? `glass-card ${className}` : 'glass-card'}>
       <div className="metric-head">
@@ -111,7 +111,7 @@ function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey
       <p className={large ? 'value-large' : 'value-medium'}>
         {value?.toFixed(1) ?? '--'}<span className="unit">{unit}</span>
       </p>
-      <MetricChart history={history} dataKey={dataKey} unit={unit} color={color} rangeMs={rangeMs} />
+      <MetricChart history={history} dataKey={dataKey} unit={unit} color={color} rangeMs={rangeMs} yUnit={yUnit} yScale={yScale} yDecimals={yDecimals} />
     </div>
   );
 }
@@ -194,6 +194,9 @@ function App() {
               color="var(--accent)"
               rangeMs={rangeMs}
             />
+            {/* Kaaviossa ilmanpaine näytetään kilopascaleina (1 kPa = 10 hPa),
+                jotta lukema on lyhyempi kuin hPa:na (esim. "100.78 kPa").
+                Päämittari pysyy hehtopascaleina. */}
             <MetricCard
               title="Ilmanpaine"
               value={telemetry?.pressure_hpa}
@@ -202,6 +205,9 @@ function App() {
               dataKey="pressure"
               color="var(--success)"
               rangeMs={rangeMs}
+              yUnit="kPa"
+              yScale={10}
+              yDecimals={2}
             />
           </div>
 
