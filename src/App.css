@@ -770,16 +770,6 @@ body, html {
   gap: 1rem;
   max-width: 40rem;
 }
-.maintenance-gear {
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  color: #fbbf24;
-  animation: maint-spin 6s linear infinite;
-}
-@keyframes maint-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 .maintenance-logo {
   margin: 0;
   font-family: var(--font-display);
@@ -788,6 +778,7 @@ body, html {
   letter-spacing: 0.12em;
   line-height: 0.95;
   color: #fff;
+  white-space: nowrap; /* "PORI SPACE LAB" pysyy yhdellä rivillä */
 }
 .maintenance-status {
   margin: 0;
@@ -802,9 +793,20 @@ body, html {
   font-family: var(--font-sans);
   font-size: clamp(0.85rem, 1.6vw, 1.1rem);
   color: #94a3b8;
+  min-height: 1.4em; /* varaa tila ettei asettelu hyppää kun teksti tyhjenee */
+}
+.maintenance-caret {
+  margin-left: 2px;
+  color: #fbbf24;
+  animation: maint-caret-blink 1s step-end infinite;
+}
+@keyframes maint-caret-blink {
+  50% {
+    opacity: 0;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .maintenance-gear {
+  .maintenance-caret {
     animation: none;
   }
 }
