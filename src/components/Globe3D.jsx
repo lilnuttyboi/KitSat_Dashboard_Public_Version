@@ -28,7 +28,12 @@ const ORBIT_DEG_PER_SEC = 8;   // Kierto: täysi kierros ~45 s
 const TOP_PITCH_DEG = -89;     // Ylhäältä: lähes suoraan alas (ei tasan -90)
 const TOP_HEADING_DEG = 0;     // Ylhäältä: pohjoinen ylös
 const TOP_RANGE_FACTOR = 1.5;  // Ylhäältä istuu hieman lähempänä kuin sivu (2.2)
-const FLYOVER_DURATION = 4.0;  // Lento-animaation kesto sekunteina
+// "Lento" on kaksivaiheinen, hidas ja elokuvamainen liike:
+const LENTO_SWEEP_SEC = 12.0;          // vaihe 1: hidas pyyhkäisy koko reitin yli
+const LENTO_SETTLE_SEC = 5.0;          // vaihe 2: pehmeä laskeutuminen seurantaan
+const LENTO_FOLLOW_HEADING_DEG = 35;   // loppuseurannan sivukulma
+const LENTO_FOLLOW_PITCH_DEG = -18;    // loiva yläviisto
+const LENTO_FOLLOW_RANGE_FACTOR = 3.2; // vetäytyy kauemmas → elokuvamaisempi
 
 // Sivu/Kierto: etäisyys kasvaa korkeuden mukana, jotta korkeusverho pysyy kuvassa.
 function viewRange(altMeters) {
@@ -135,6 +140,7 @@ function Globe3D({
   const didFirstFlyRef = useRef(false);
   const cameraModeRef = useRef(cameraMode); // preRender lukee aina tuoreimman tilan
   const orbitStartRef = useRef(null);       // Cesium.JulianDate: kierron alkuhetki
+  const lentoFollowRef = useRef(false);     // "lento"-seuranta lukittu kunnes reset
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
 
   // Lentää valitun kameratilan asentoon ja kytkee seurannan päälle.
@@ -145,6 +151,7 @@ function Globe3D({
     if (!Cesium || !viewer || viewer.isDestroyed() || !craftPosRef.current) return;
     viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
     autoTrackRef.current = false;
+    lentoFollowRef.current = false; // reset/uudelleenkehystys lopettaa lento-seurannan
     if (cameraModeRef.current === 'kierto') {
       orbitStartRef.current = Cesium.JulianDate.clone(viewer.clock.currentTime);
     }
@@ -238,7 +245,12 @@ function Globe3D({
           if (!autoTrackRef.current || !craftPosRef.current) return;
           const mode = cameraModeRef.current;
           const a = altRef.current;
-          if (mode === 'kierto') {
+          if (lentoFollowRef.current) {
+            // Lukittu lento-seuranta: vetäytynyt elokuvamainen kulma satelliittiin.
+            trackHpr.heading = Cesium.Math.toRadians(LENTO_FOLLOW_HEADING_DEG);
+            trackHpr.pitch = Cesium.Math.toRadians(LENTO_FOLLOW_PITCH_DEG);
+            trackHpr.range = VIEW_BASE_RANGE + (Number.isFinite(a) ? a : 0) * LENTO_FOLLOW_RANGE_FACTOR;
+          } else if (mode === 'kierto') {
             const elapsed = orbitStartRef.current
               ? Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, orbitStartRef.current)
               : 0;
@@ -329,6 +341,7 @@ function Globe3D({
   // ja tilan valinta jatkaa seurantaa (käyttäjän tahto seurata).
   useEffect(() => {
     cameraModeRef.current = cameraMode;
+    lentoFollowRef.current = false; // tilan vaihto lopettaa lento-seurannan
     const Cesium = cesiumRef.current;
     const viewer = viewerRef.current;
     if (!Cesium || !viewer || viewer.isDestroyed() || status !== 'ready') return;
@@ -344,7 +357,8 @@ function Globe3D({
     flyToCurrentPose();
   }, [resetNonce, flyToCurrentPose]);
 
-  // "Lento": pyyhkäise koko reitin yli ja palaa seurantaan valittuun tilaan.
+  // "Lento": hidas, pehmennetty pyyhkäisy koko reitin yli → laskeutuu satelliitin
+  // elokuvamaiseen seurantaan ja PYSYY siinä kunnes Palauta näkymä painetaan.
   useEffect(() => {
     if (flyoverNonce === 0) return;
     const Cesium = cesiumRef.current;
@@ -352,23 +366,39 @@ function Globe3D({
     if (!Cesium || !viewer || viewer.isDestroyed() || !craftPosRef.current) return;
     viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
     autoTrackRef.current = false;
+    lentoFollowRef.current = false;
     const positions = positionsRef.current;
-    const sphere =
+    const routeSphere =
       positions.length >= 2
         ? Cesium.BoundingSphere.fromPoints(positions)
         : new Cesium.BoundingSphere(craftPosRef.current, VIEW_BASE_RANGE);
-    viewer.camera.flyToBoundingSphere(sphere, {
+
+    // Vaihe 1: hidas, pehmennetty pyyhkäisy koko reitin yli.
+    viewer.camera.flyToBoundingSphere(routeSphere, {
       offset: new Cesium.HeadingPitchRange(
         Cesium.Math.toRadians(VIEW_HEADING_DEG),
         Cesium.Math.toRadians(-30),
-        sphere.radius * 2.5
+        routeSphere.radius * 2.5
       ),
-      duration: FLYOVER_DURATION,
+      duration: LENTO_SWEEP_SEC,
+      easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT,
       complete: () => {
-        if (cameraModeRef.current === 'kierto') {
-          orbitStartRef.current = Cesium.JulianDate.clone(viewer.clock.currentTime);
-        }
-        autoTrackRef.current = true;
+        if (viewer.isDestroyed() || !craftPosRef.current) return;
+        // Vaihe 2: laskeudu pehmeästi satelliitin elokuvamaiseen seurantaan.
+        viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(craftPosRef.current, 1), {
+          offset: new Cesium.HeadingPitchRange(
+            Cesium.Math.toRadians(LENTO_FOLLOW_HEADING_DEG),
+            Cesium.Math.toRadians(LENTO_FOLLOW_PITCH_DEG),
+            VIEW_BASE_RANGE + (Number.isFinite(altRef.current) ? altRef.current : 0) * LENTO_FOLLOW_RANGE_FACTOR
+          ),
+          duration: LENTO_SETTLE_SEC,
+          easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT,
+          complete: () => {
+            if (viewer.isDestroyed()) return;
+            lentoFollowRef.current = true; // lukitse seuranta kunnes reset
+            autoTrackRef.current = true;
+          },
+        });
       },
     });
   }, [flyoverNonce]);
