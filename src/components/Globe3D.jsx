@@ -155,6 +155,9 @@ function Globe3D({
         autoTrackRef.current = true;
       },
     });
+    // Tyhjä dep-taulukko on tarkoituksellinen: funktio lukee kameratilan ja
+    // sijainnin refien kautta → vakaa identiteetti, ei vanhentunutta sulkeumaa.
+    // Älä "korjaa" exhaustive-depsin mukaan, se rikkoisi palautus-/seurantalogiikan.
   }, []);
 
   // Alusta Cesium-viewer kerran.
