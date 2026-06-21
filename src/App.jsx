@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { useTelemetry } from './hooks/useTelemetry';
 import LatestImage from './components/LatestImage';
 import FlightTimer from './components/FlightTimer';
-import ControlPanel from './components/ControlPanel';
 import MaintenanceOverlay from './components/MaintenanceOverlay';
+import { createControlChannel, readPersistedState, writePersistedState } from './lib/controlChannel';
 import './App.css';
 
 // Lazy-ladataan raskaat riippuvuudet (leaflet, recharts) omiin chunkkeihinsa,
@@ -122,13 +122,68 @@ function App() {
   const { telemetry, history, loading, status, maxAlt, minTemp, maxSpeed, flightStartMs, lastDataMs } = useTelemetry();
   const [rangeMs, setRangeMs] = useState(60_000);
   const [theme, toggleTheme] = useTheme();
-  const [mapMode, setMapMode] = useState('3d'); // '3d' = oletus (näyttävin yleisölle)
-  const [basemap, setBasemap] = useState('satellite');   // 'satellite' | 'kartta'
-  const [cameraMode, setCameraMode] = useState('sivu');  // 'sivu' | 'kierto' | 'ylha'
+  // Säätötila siemennetään pysyvyydestä, jotta koontinäytön lataus palauttaa
+  // viimeisimmät valinnat (ja täsmää ohjausikkunan kanssa).
+  const [mapMode, setMapMode] = useState(() => readPersistedState().mapMode);       // '2d' | '3d'
+  const [basemap, setBasemap] = useState(() => readPersistedState().basemap);       // 'satellite' | 'kartta'
+  const [cameraMode, setCameraMode] = useState(() => readPersistedState().cameraMode); // 'sivu' | 'kierto' | 'ylha'
   const [resetNonce, setResetNonce] = useState(0);       // bump -> Globe3D kehystää uudelleen
   const [flyoverNonce, setFlyoverNonce] = useState(0);   // bump -> Globe3D lentää reitin yli
-  const [panelOpen, setPanelOpen] = useState(true);      // ohjauspaneelin näkyvyys
-  const [maintenance, setMaintenance] = useState(false); // huoltotila: peittää näkymän
+  const [maintenance, setMaintenance] = useState(() => readPersistedState().maintenance); // huoltotila
+  const [controlConnected, setControlConnected] = useState(false); // onko ohjausikkuna kytketty
+
+  // ── Ohjauskanava: erillinen #ohjaus-ikkuna ohjaa tätä koontinäyttöä ──────
+  // Koontinäyttö on tilan ainoa lähde: se soveltaa komennot ja lähettää
+  // tuoreimman tilan takaisin (nappien korostuksia varten).
+  const channelRef = useRef(null);
+  const stateRef = useRef(null);
+  if (stateRef.current === null) {
+    stateRef.current = { mapMode, basemap, cameraMode, maintenance };
+  }
+
+  useEffect(() => {
+    const channel = createControlChannel();
+    channelRef.current = channel;
+
+    const unsubscribe = channel.subscribe((msg) => {
+      if (!msg || typeof msg !== 'object') return;
+      if (msg.type === 'hello') {
+        setControlConnected(true);
+        channel.post({ type: 'state', state: stateRef.current });
+        return;
+      }
+      if (msg.type === 'bye') {
+        setControlConnected(false);
+        return;
+      }
+      if (msg.type === 'command') {
+        switch (msg.name) {
+          case 'setMapMode': setMapMode(msg.value); break;
+          case 'setBasemap': setBasemap(msg.value); break;
+          case 'setCameraMode': setCameraMode(msg.value); break;
+          case 'setMaintenance': setMaintenance(Boolean(msg.value)); break;
+          case 'reset': setResetNonce((n) => n + 1); break;
+          case 'lento': setFlyoverNonce((n) => n + 1); break;
+          default: break;
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      channel.close();
+      channelRef.current = null;
+    };
+  }, []);
+
+  // Lähetä tuorein tila ohjausikkunalle ja säilö se. Tämä efekti ajetaan myös
+  // mountissa → ennen koontinäyttöä avattu ohjausikkuna saa tilan heti.
+  useEffect(() => {
+    const snapshot = { mapMode, basemap, cameraMode, maintenance };
+    stateRef.current = snapshot;
+    writePersistedState(snapshot);
+    channelRef.current?.post({ type: 'state', state: snapshot });
+  }, [mapMode, basemap, cameraMode, maintenance]);
   const route = useMemo(() => buildRoute(history), [history]);
   const route3d = useMemo(() => buildRoute3d(history), [history]);
 
@@ -224,20 +279,22 @@ function App() {
             {/* Karttatyypin valitsin pysyy näkyvissä molemmissa tiloissa, joten
                 se renderöidään tässä — ei Globe3D:n sisällä, joka unmountataan
                 kun 2D-kartta on valittuna. */}
-            <div className="map-mode-toggle">
-              <button
-                className={`range-btn${mapMode === '3d' ? ' active' : ''}`}
-                onClick={() => setMapMode('3d')}
-              >
-                3D
-              </button>
-              <button
-                className={`range-btn${mapMode === '2d' ? ' active' : ''}`}
-                onClick={() => setMapMode('2d')}
-              >
-                2D
-              </button>
-            </div>
+            {!controlConnected && (
+              <div className="map-mode-toggle">
+                <button
+                  className={`range-btn${mapMode === '3d' ? ' active' : ''}`}
+                  onClick={() => setMapMode('3d')}
+                >
+                  3D
+                </button>
+                <button
+                  className={`range-btn${mapMode === '2d' ? ' active' : ''}`}
+                  onClick={() => setMapMode('2d')}
+                >
+                  2D
+                </button>
+              </div>
+            )}
             <Suspense fallback={<div className="globe-overlay">LADATAAN KARTTAA…</div>}>
               {mapMode === '3d' ? (
                 <Globe3D
@@ -283,27 +340,19 @@ function App() {
         </Suspense>
       </main>
     </div>
-    {panelOpen ? (
-      <ControlPanel
-        basemap={basemap}
-        onBasemapChange={setBasemap}
-        cameraMode={cameraMode}
-        onCameraModeChange={setCameraMode}
-        onReset={() => setResetNonce((n) => n + 1)}
-        onFlyover={() => setFlyoverNonce((n) => n + 1)}
-        maintenance={maintenance}
-        onMaintenanceToggle={() => setMaintenance((m) => !m)}
-        mapMode={mapMode}
-        onClose={() => setPanelOpen(false)}
-      />
-    ) : (
+    {!controlConnected && (
       <button
-        className="control-launcher"
-        onClick={() => setPanelOpen(true)}
-        aria-label="Avaa ohjauspaneeli"
-        title="Avaa ohjauspaneeli"
+        className="open-control-btn"
+        onClick={() =>
+          window.open(
+            `${window.location.origin}${window.location.pathname}#ohjaus`,
+            'kitsat-ohjaus',
+            'width=420,height=720'
+          )
+        }
+        title="Avaa ohjaus erilliseen ikkunaan"
       >
-        ⚙
+        Avaa ohjaus
       </button>
     )}
     {maintenance && <MaintenanceOverlay />}
