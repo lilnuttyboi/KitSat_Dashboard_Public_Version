@@ -3,6 +3,7 @@ import { useTelemetry } from './hooks/useTelemetry';
 import LatestImage from './components/LatestImage';
 import FlightTimer from './components/FlightTimer';
 import ControlPanel from './components/ControlPanel';
+import MaintenanceOverlay from './components/MaintenanceOverlay';
 import './App.css';
 
 // Lazy-ladataan raskaat riippuvuudet (leaflet, recharts) omiin chunkkeihinsa,
@@ -127,6 +128,7 @@ function App() {
   const [resetNonce, setResetNonce] = useState(0);       // bump -> Globe3D kehystää uudelleen
   const [flyoverNonce, setFlyoverNonce] = useState(0);   // bump -> Globe3D lentää reitin yli
   const [panelOpen, setPanelOpen] = useState(true);      // ohjauspaneelin näkyvyys
+  const [maintenance, setMaintenance] = useState(false); // huoltotila: peittää näkymän
   const route = useMemo(() => buildRoute(history), [history]);
   const route3d = useMemo(() => buildRoute3d(history), [history]);
 
@@ -289,6 +291,8 @@ function App() {
         onCameraModeChange={setCameraMode}
         onReset={() => setResetNonce((n) => n + 1)}
         onFlyover={() => setFlyoverNonce((n) => n + 1)}
+        maintenance={maintenance}
+        onMaintenanceToggle={() => setMaintenance((m) => !m)}
         mapMode={mapMode}
         onClose={() => setPanelOpen(false)}
       />
@@ -302,6 +306,7 @@ function App() {
         ⚙
       </button>
     )}
+    {maintenance && <MaintenanceOverlay />}
     </>
   );
 }

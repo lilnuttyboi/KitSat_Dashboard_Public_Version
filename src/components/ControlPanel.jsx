@@ -34,6 +34,8 @@ export default function ControlPanel({
   onCameraModeChange,
   onReset,
   onFlyover,
+  maintenance,
+  onMaintenanceToggle,
   mapMode,
   onClose,
 }) {
@@ -148,6 +150,16 @@ export default function ControlPanel({
         <button className="range-btn control-wide" onClick={onReset} disabled={is2d}>
           Palauta näkymä
         </button>
+
+        <div className="control-section">
+          <span className="control-label">Huolto</span>
+          <button
+            className={`range-btn control-wide${maintenance ? ' active' : ''}`}
+            onClick={onMaintenanceToggle}
+          >
+            {maintenance ? 'Lopeta huoltotila' : 'Huoltotila'}
+          </button>
+        </div>
       </div>
     </div>
   );
