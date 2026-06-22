@@ -49,6 +49,10 @@ export default function ControlWindow() {
         onFlyover={() => command('lento')}
         maintenance={state.maintenance}
         onMaintenanceToggle={() => command('setMaintenance', !state.maintenance)}
+        theme={state.theme}
+        onThemeChange={(v) => command('setTheme', v)}
+        range={state.range}
+        onRangeChange={(v) => command('setRange', v)}
       />
     </div>
   );
