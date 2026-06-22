@@ -176,6 +176,9 @@ function App() {
 
   // Lähetä tuorein tila ohjausikkunalle ja säilö se. Tämä efekti ajetaan myös
   // mountissa → ennen koontinäyttöä avattu ohjausikkuna saa tilan heti.
+  // HUOM: snapshotin `theme` on vain PEILI ohjausikkunan korostusta varten;
+  // teeman varsinainen lähde on useTheme + localStorage('theme') (säilyttää
+  // käyttöjärjestelmäseurannan). Älä siemennä koontinäytön teemaa tästä tilasta.
   useEffect(() => {
     const snapshot = { mapMode, basemap, cameraMode, maintenance, theme, range: rangeMs };
     stateRef.current = snapshot;
