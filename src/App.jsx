@@ -158,7 +158,8 @@ function App() {
           case 'setCameraMode': setCameraMode(msg.value); break;
           case 'setMaintenance': setMaintenance(Boolean(msg.value)); break;
           case 'setTheme': setThemeChoiceRef.current(msg.value === 'light' ? 'light' : 'dark'); break;
-          case 'setRange': setRangeMs(msg.value); break;
+          // Hyväksy vain kelvollinen aikaväli: null (MAX) tai äärellinen luku (ms).
+          case 'setRange': if (msg.value === null || Number.isFinite(msg.value)) setRangeMs(msg.value); break;
           case 'reset': setResetNonce((n) => n + 1); break;
           case 'lento': setFlyoverNonce((n) => n + 1); break;
           default: break;
