@@ -699,6 +699,8 @@ body, html {
 /* "Avaa ohjaus" -ratasnappi yläpalkissa; piilotetaan kun ohjausikkuna on auki.
    Yläpalkki on aina tumma → värit kovakoodataan. */
 .open-control-btn {
+  position: relative; /* huoltoruudun (z 1500) yläpuolelle → pysyy klikattavana huoltotilassa */
+  z-index: 1600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
