@@ -110,13 +110,6 @@ body, html {
   gap: 0.75rem 1rem;
 }
 
-.header-range {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-}
-
 .flight-time,
 .flight-id {
   display: flex;
@@ -481,11 +474,6 @@ body, html {
   0% { opacity: 1; }
   50% { opacity: 0.5; }
   100% { opacity: 1; }
-}
-
-.theme-btn {
-  display: flex;
-  align-items: center;
 }
 
 /* Vaalean teeman korjaukset komponenteille, joilla on kovakoodattu tumma

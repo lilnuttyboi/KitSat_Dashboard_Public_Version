@@ -12,14 +12,6 @@ const MapComponent = lazy(() => import('./components/MapComponent'));
 const Globe3D = lazy(() => import('./components/Globe3D'));
 const MetricChart = lazy(() => import('./components/MetricChart'));
 
-const RANGES = [
-  { label: '1m', ms: 60_000 },
-  { label: '5m', ms: 300_000 },
-  { label: '30m', ms: 1_800_000 },
-  { label: '1h', ms: 3_600_000 },
-  { label: 'MAX', ms: null },
-];
-
 const ROUTE_MAX_POINTS = 2000;
 
 // Teema: käyttäjän tallentama valinta voittaa, muuten käyttöjärjestelmän oletus.
@@ -54,7 +46,14 @@ function useTheme() {
     });
   };
 
-  return [theme, toggleTheme];
+  // Aseta teema suoraan annettuun arvoon (ohjauspaneelin Teema-napit).
+  const setThemeChoice = (value) => {
+    const next = value === 'light' ? 'light' : 'dark';
+    localStorage.setItem('theme', next);
+    setTheme(next);
+  };
+
+  return [theme, toggleTheme, setThemeChoice];
 }
 
 // Reitti on vain visuaalinen: harvennetaan tasavälein mutta pidetään viimeisin
@@ -87,17 +86,6 @@ function buildRoute3d(history) {
   return downsample(pts);
 }
 
-const Icon = ({ children }) => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    {children}
-  </svg>
-);
-
-const ICONS = {
-  sun: <Icon><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></Icon>,
-  moon: <Icon><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></Icon>,
-};
-
 // Mittarikortti: otsikko ikonilla, nykyarvo, valinnainen min/max-rivi ja kaavio.
 function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey, color, rangeMs, large = false, className, yUnit, yScale, yDecimals }) {
   return (
@@ -120,8 +108,8 @@ function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey
 
 function App() {
   const { telemetry, history, loading, status, maxAlt, minTemp, maxSpeed, flightStartMs, lastDataMs } = useTelemetry();
-  const [rangeMs, setRangeMs] = useState(60_000);
-  const [theme, toggleTheme] = useTheme();
+  const [rangeMs, setRangeMs] = useState(() => readPersistedState().range); // ms tai null (MAX)
+  const [theme, , setThemeChoice] = useTheme(); // setThemeChoice: ohjauspaneelin Teema-komento
   // Säätötila siemennetään pysyvyydestä, jotta koontinäytön lataus palauttaa
   // viimeisimmät valinnat (ja täsmää ohjausikkunan kanssa).
   const [mapMode, setMapMode] = useState(() => readPersistedState().mapMode);       // '2d' | '3d'
@@ -138,8 +126,15 @@ function App() {
   const channelRef = useRef(null);
   const stateRef = useRef(null);
   if (stateRef.current === null) {
-    stateRef.current = { mapMode, basemap, cameraMode, maintenance };
+    stateRef.current = { mapMode, basemap, cameraMode, maintenance, theme, range: rangeMs };
   }
+  // Pidä viimeisin teemansetteri refissä, jottei mount-efektin (kanava) tarvitse
+  // riippua siitä — useTheme luo sen joka renderillä. Päivitys efektissä eikä
+  // renderissä (react-hooks/refs: refiä ei kirjoiteta renderin aikana).
+  const setThemeChoiceRef = useRef(setThemeChoice);
+  useEffect(() => {
+    setThemeChoiceRef.current = setThemeChoice;
+  });
 
   useEffect(() => {
     const channel = createControlChannel();
@@ -162,6 +157,8 @@ function App() {
           case 'setBasemap': setBasemap(msg.value); break;
           case 'setCameraMode': setCameraMode(msg.value); break;
           case 'setMaintenance': setMaintenance(Boolean(msg.value)); break;
+          case 'setTheme': setThemeChoiceRef.current(msg.value === 'light' ? 'light' : 'dark'); break;
+          case 'setRange': setRangeMs(msg.value); break;
           case 'reset': setResetNonce((n) => n + 1); break;
           case 'lento': setFlyoverNonce((n) => n + 1); break;
           default: break;
@@ -179,11 +176,11 @@ function App() {
   // Lähetä tuorein tila ohjausikkunalle ja säilö se. Tämä efekti ajetaan myös
   // mountissa → ennen koontinäyttöä avattu ohjausikkuna saa tilan heti.
   useEffect(() => {
-    const snapshot = { mapMode, basemap, cameraMode, maintenance };
+    const snapshot = { mapMode, basemap, cameraMode, maintenance, theme, range: rangeMs };
     stateRef.current = snapshot;
     writePersistedState(snapshot);
     channelRef.current?.post({ type: 'state', state: snapshot });
-  }, [mapMode, basemap, cameraMode, maintenance]);
+  }, [mapMode, basemap, cameraMode, maintenance, theme, rangeMs]);
   const route = useMemo(() => buildRoute(history), [history]);
   const route3d = useMemo(() => buildRoute3d(history), [history]);
 
@@ -205,22 +202,8 @@ function App() {
             <span className="flight-time-label">Lentoaika</span>
             <FlightTimer startMs={flightStartMs} lastDataMs={lastDataMs} />
           </div>
-          <div className="header-range">
-            {RANGES.map((r) => (
-              <button
-                key={r.label}
-                className={`range-btn${rangeMs === r.ms ? ' active' : ''}`}
-                onClick={() => setRangeMs(r.ms)}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
         </div>
         <div className="header-right">
-          <button className="range-btn theme-btn" onClick={toggleTheme} aria-label="Vaihda teema" title="Vaihda teema">
-            {theme === 'dark' ? ICONS.sun : ICONS.moon}
-          </button>
           <div className={`status-indicator ${status}`}>
             <span className="status-dot"></span>
             {status === 'online' ? 'VERKOSSA' : 'EI YHTEYTTÄ'}
@@ -350,9 +333,10 @@ function App() {
             'width=420,height=720'
           )
         }
+        aria-label="Avaa ohjaus erilliseen ikkunaan"
         title="Avaa ohjaus erilliseen ikkunaan"
       >
-        Avaa ohjaus
+        ⚙
       </button>
     )}
     {maintenance && <MaintenanceOverlay />}
