@@ -699,8 +699,6 @@ body, html {
 /* "Avaa ohjaus" -ratasnappi yläpalkissa; piilotetaan kun ohjausikkuna on auki.
    Yläpalkki on aina tumma → värit kovakoodataan. */
 .open-control-btn {
-  position: relative; /* huoltoruudun (z 1500) yläpuolelle → pysyy klikattavana huoltotilassa */
-  z-index: 1600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -716,6 +714,33 @@ body, html {
   transition: color 0.15s, border-color 0.15s;
 }
 .open-control-btn:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+/* Ratasnappi huoltoruudun (z 1500) PÄÄLLÄ → ohjauksen saa auki huoltotilassakin.
+   Renderöidään juuritasolla (ei yläpalkissa, jonka backdrop-filter loukkuttaisi sen
+   splashin alle). Aina tumma. */
+.maintenance-launcher {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2000;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  background: rgba(11, 15, 26, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.maintenance-launcher:hover {
   color: #fff;
   border-color: #fff;
 }

@@ -188,6 +188,15 @@ function App() {
   const route = useMemo(() => buildRoute(history), [history]);
   const route3d = useMemo(() => buildRoute3d(history), [history]);
 
+  // Avaa erillinen ohjausikkuna (#ohjaus). Sama toiminto yläpalkin ja
+  // huoltoruudun ratasnapeille.
+  const openControl = () =>
+    window.open(
+      `${window.location.origin}${window.location.pathname}#ohjaus`,
+      'kitsat-ohjaus',
+      'width=420,height=720'
+    );
+
   if (loading) {
     return <div className="loading">YHDISTETÄÄN OHJAUSKESKUKSEEN...</div>;
   }
@@ -208,16 +217,10 @@ function App() {
           </div>
         </div>
         <div className="header-right">
-          {!controlConnected && (
+          {!controlConnected && !maintenance && (
             <button
               className="open-control-btn"
-              onClick={() =>
-                window.open(
-                  `${window.location.origin}${window.location.pathname}#ohjaus`,
-                  'kitsat-ohjaus',
-                  'width=420,height=720'
-                )
-              }
+              onClick={openControl}
               aria-label="Avaa ohjaus erilliseen ikkunaan"
               title="Avaa ohjaus erilliseen ikkunaan"
             >
@@ -326,6 +329,18 @@ function App() {
       </main>
     </div>
     {maintenance && <MaintenanceOverlay />}
+    {/* Ratasnappi huoltoruudun PÄÄLLE: ainoa tapa avata ohjaus takaisin, kun
+        huoltotila peittää yläpalkin ratasnapin. Näkyy vain kun ohjaus ei ole auki. */}
+    {maintenance && !controlConnected && (
+      <button
+        className="maintenance-launcher"
+        onClick={openControl}
+        aria-label="Avaa ohjaus erilliseen ikkunaan"
+        title="Avaa ohjaus erilliseen ikkunaan"
+      >
+        ⚙
+      </button>
+    )}
     </>
   );
 }
