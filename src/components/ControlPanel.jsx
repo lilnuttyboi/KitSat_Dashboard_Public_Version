@@ -1,6 +1,16 @@
-// Ohjauspaneeli: napit näkymälle (2D/3D), pohjakartalle, kameralle ja
-// huoltotilalle. Renderöidään erillisen ohjausikkunan sisään (täyttää ikkunan)
-// — ei enää kelluva/raahattava. Tila ja takaisinkutsut tulevat isännältä.
+// Ohjauspaneeli: napit näkymälle (2D/3D), pohjakartalle, kameralle, teemalle,
+// kaavioiden aikavälille ja huoltotilalle. Renderöidään erillisen ohjausikkunan
+// sisään (täyttää ikkunan). Tila ja takaisinkutsut tulevat isännältä.
+
+// Kaavioiden aikavälit (sama lista kuin ennen koontinäytön yläpalkissa).
+const RANGES = [
+  { label: '1m', ms: 60_000 },
+  { label: '5m', ms: 300_000 },
+  { label: '30m', ms: 1_800_000 },
+  { label: '1h', ms: 3_600_000 },
+  { label: 'MAX', ms: null },
+];
+
 export default function ControlPanel({
   mapMode,
   onMapModeChange,
@@ -12,6 +22,10 @@ export default function ControlPanel({
   onFlyover,
   maintenance,
   onMaintenanceToggle,
+  theme,
+  onThemeChange,
+  range,
+  onRangeChange,
 }) {
   const is2d = mapMode === '2d';
 
@@ -87,6 +101,39 @@ export default function ControlPanel({
       <button className="range-btn control-wide" onClick={onReset} disabled={is2d}>
         Palauta näkymä
       </button>
+
+      <div className="control-section">
+        <span className="control-label">Teema</span>
+        <div className="control-row">
+          <button
+            className={`range-btn${theme === 'dark' ? ' active' : ''}`}
+            onClick={() => onThemeChange('dark')}
+          >
+            Tumma
+          </button>
+          <button
+            className={`range-btn${theme === 'light' ? ' active' : ''}`}
+            onClick={() => onThemeChange('light')}
+          >
+            Vaalea
+          </button>
+        </div>
+      </div>
+
+      <div className="control-section">
+        <span className="control-label">Aikaväli</span>
+        <div className="control-row">
+          {RANGES.map((r) => (
+            <button
+              key={r.label}
+              className={`range-btn${range === r.ms ? ' active' : ''}`}
+              onClick={() => onRangeChange(r.ms)}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="control-section">
         <span className="control-label">Huolto</span>
