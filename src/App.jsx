@@ -208,6 +208,22 @@ function App() {
           </div>
         </div>
         <div className="header-right">
+          {!controlConnected && (
+            <button
+              className="open-control-btn"
+              onClick={() =>
+                window.open(
+                  `${window.location.origin}${window.location.pathname}#ohjaus`,
+                  'kitsat-ohjaus',
+                  'width=420,height=720'
+                )
+              }
+              aria-label="Avaa ohjaus erilliseen ikkunaan"
+              title="Avaa ohjaus erilliseen ikkunaan"
+            >
+              ⚙
+            </button>
+          )}
           <div className={`status-indicator ${status}`}>
             <span className="status-dot"></span>
             {status === 'online' ? 'VERKOSSA' : 'EI YHTEYTTÄ'}
@@ -263,25 +279,7 @@ function App() {
           </div>
 
           <div className="glass-card map-section">
-            {/* Karttatyypin valitsin pysyy näkyvissä molemmissa tiloissa, joten
-                se renderöidään tässä — ei Globe3D:n sisällä, joka unmountataan
-                kun 2D-kartta on valittuna. */}
-            {!controlConnected && (
-              <div className="map-mode-toggle">
-                <button
-                  className={`range-btn${mapMode === '3d' ? ' active' : ''}`}
-                  onClick={() => setMapMode('3d')}
-                >
-                  3D
-                </button>
-                <button
-                  className={`range-btn${mapMode === '2d' ? ' active' : ''}`}
-                  onClick={() => setMapMode('2d')}
-                >
-                  2D
-                </button>
-              </div>
-            )}
+            {/* Karttatyyppi (2D/3D) valitaan vain ohjauspaneelista — ei kartalla. */}
             <Suspense fallback={<div className="globe-overlay">LADATAAN KARTTAA…</div>}>
               {mapMode === '3d' ? (
                 <Globe3D
@@ -327,22 +325,6 @@ function App() {
         </Suspense>
       </main>
     </div>
-    {!controlConnected && (
-      <button
-        className="open-control-btn"
-        onClick={() =>
-          window.open(
-            `${window.location.origin}${window.location.pathname}#ohjaus`,
-            'kitsat-ohjaus',
-            'width=420,height=720'
-          )
-        }
-        aria-label="Avaa ohjaus erilliseen ikkunaan"
-        title="Avaa ohjaus erilliseen ikkunaan"
-      >
-        ⚙
-      </button>
-    )}
     {maintenance && <MaintenanceOverlay />}
     </>
   );
