@@ -723,25 +723,31 @@ body, html {
 }
 
 /* "Avaa ohjaus" -nappi koontinäytöllä; piilotetaan kun ohjausikkuna on auki. */
+/* Pieni ratas-nappi: huomaamaton, katoaa kun ohjausikkuna on kytketty. */
 .open-control-btn {
   position: fixed;
   bottom: 16px;
   right: 16px;
   z-index: 2000;
-  font-family: var(--font-display);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 0.5rem 0.75rem;
-  background: rgba(11, 15, 26, 0.92);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  background: rgba(11, 15, 26, 0.72);
   backdrop-filter: var(--glass);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 4px;
-  color: #f1f5f9;
+  color: #94a3b8;
   cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
 }
 .open-control-btn:hover {
+  opacity: 1;
+  color: #fff;
   border-color: #fff;
 }
 
@@ -770,44 +776,27 @@ body, html {
   gap: 1rem;
   max-width: 40rem;
 }
-.maintenance-logo {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2.2rem, 7vw, 5rem);
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  line-height: 0.95;
-  color: #fff;
-  white-space: nowrap; /* "PORI SPACE LAB" pysyy yhdellä rivillä */
+/* Logorivi: keskitetty, kietoutuu usealle logolle (nyt yksi). */
+.maintenance-logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.5rem, 4vw, 3rem);
 }
-.maintenance-status {
+.maintenance-logo-img {
+  max-height: clamp(4rem, 16vw, 9rem);
+  max-width: 80vw;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+/* Valinnainen iskulause (näkyy vain kun TAGLINE on asetettu). */
+.maintenance-tagline {
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(0.9rem, 2vw, 1.4rem);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: #fbbf24;
-}
-.maintenance-funny {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: clamp(0.85rem, 1.6vw, 1.1rem);
+  letter-spacing: 0.15em;
   color: #94a3b8;
-  min-height: 1.4em; /* varaa tila ettei asettelu hyppää kun teksti tyhjenee */
-}
-.maintenance-caret {
-  margin-left: 2px;
-  color: #fbbf24;
-  animation: maint-caret-blink 1s step-end infinite;
-}
-@keyframes maint-caret-blink {
-  50% {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .maintenance-caret {
-    animation: none;
-  }
 }
 
