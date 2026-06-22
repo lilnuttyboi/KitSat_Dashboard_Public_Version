@@ -11,6 +11,8 @@ const DEFAULT_STATE = {
   basemap: 'satellite', // 'satellite' | 'kartta'
   cameraMode: 'sivu',   // 'sivu' | 'kierto' | 'ylha'
   maintenance: false,
+  theme: 'dark',        // 'dark' | 'light'
+  range: 60000,         // kaavioiden aikaväli ms; null = MAX
 };
 
 // Lue pysyvä tila; palauta oletukset jos puuttuu tai viallinen.
