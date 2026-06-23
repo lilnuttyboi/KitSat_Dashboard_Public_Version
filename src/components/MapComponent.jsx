@@ -94,7 +94,7 @@ const MapComponent = memo(({ lat, lng, route = [], theme = 'dark', basemap = 'sa
         ) : (
           <TileLayer
             key={theme}
-            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="http://openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url={TILE_URLS[theme] ?? TILE_URLS.dark}
             subdomains="abcd"
           />
