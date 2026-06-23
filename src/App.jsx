@@ -15,47 +15,8 @@ const MetricChart = lazy(() => import('./components/MetricChart'));
 
 const ROUTE_MAX_POINTS = 2000;
 
-// Teema: käyttäjän tallentama valinta voittaa, muuten käyttöjärjestelmän oletus.
-const getInitialTheme = () => {
-  const saved = localStorage.getItem('theme');
-  if (saved === 'light' || saved === 'dark') return saved;
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-};
-
-function useTheme() {
-  const [theme, setTheme] = useState(getInitialTheme);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
-
-  // Seurataan käyttöjärjestelmän teemaa niin kauan kuin käyttäjä ei ole
-  // tehnyt omaa valintaa.
-  useEffect(() => {
-    if (localStorage.getItem('theme')) return;
-    const mq = window.matchMedia('(prefers-color-scheme: light)');
-    const onChange = (e) => setTheme(e.matches ? 'light' : 'dark');
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-
-  const toggleTheme = () => {
-    setTheme((t) => {
-      const next = t === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('theme', next);
-      return next;
-    });
-  };
-
-  // Aseta teema suoraan annettuun arvoon (ohjauspaneelin Teema-napit).
-  const setThemeChoice = (value) => {
-    const next = value === 'light' ? 'light' : 'dark';
-    localStorage.setItem('theme', next);
-    setTheme(next);
-  };
-
-  return [theme, toggleTheme, setThemeChoice];
-}
+// Yksi teema (tumma) — sivu näyttää aina avaruusteemalta.
+const THEME = 'dark';
 
 // Reitti on vain visuaalinen: harvennetaan tasavälein mutta pidetään viimeisin
 // piste mukana, jotta jälki on ajan tasalla. Raakadata ei muutu.
@@ -110,7 +71,7 @@ function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey
 function App() {
   const { telemetry, history, loading, status, maxAlt, minTemp, maxSpeed, flightStartMs, lastDataMs } = useTelemetry();
   const [rangeMs, setRangeMs] = useState(() => readPersistedState().range); // ms tai null (MAX)
-  const [theme, , setThemeChoice] = useTheme(); // setThemeChoice: ohjauspaneelin Teema-komento
+  const theme = THEME; // yksi teema; välitetään kartoille tiilivalintaa varten
   // Säätötila siemennetään pysyvyydestä, jotta koontinäytön lataus palauttaa
   // viimeisimmät valinnat (ja täsmää ohjausikkunan kanssa).
   const [mapMode, setMapMode] = useState(() => readPersistedState().mapMode);       // '2d' | '3d'
@@ -122,10 +83,12 @@ function App() {
   const [axisUnits, setAxisUnits] = useState(() => readPersistedState().axisUnits); // kaavioiden Y-akselin asteikko
   const [controlOpen, setControlOpen] = useState(false); // onko asetuspaneeli auki (samassa välilehdessä)
 
+  // Lukitse dokumentin teema-attribuutti tummaksi (yksi teema).
+  useEffect(() => {
+    document.documentElement.dataset.theme = THEME;
+  }, []);
+
   // Säilö säätötila localStorageen, jotta valinnat palautuvat sivun latauksessa.
-  // HUOM: `theme` säilötään myös tähän nappien korostusta varten, mutta teeman
-  // varsinainen lähde on useTheme + localStorage('theme') (säilyttää
-  // käyttöjärjestelmäseurannan). Älä siemennä koontinäytön teemaa tästä tilasta.
   useEffect(() => {
     writePersistedState({ mapMode, basemap, cameraMode, maintenance, theme, range: rangeMs, axisUnits });
   }, [mapMode, basemap, cameraMode, maintenance, theme, rangeMs, axisUnits]);
@@ -171,8 +134,7 @@ function App() {
 
       <main className="dashboard-grid">
         <Suspense fallback={<div className="loading">LADATAAN…</div>}>
-          {/* Korkeuskäyrä on keltainen molemmissa teemoissa (light-teeman
-              --primary on tummempi amber, joten väri kovakoodataan) */}
+          {/* Korkeuskäyrä on aina keltainen (väri kovakoodataan) */}
           <MetricCard
             className="altitude-section"
             large
@@ -289,8 +251,6 @@ function App() {
         onFlyover={() => setFlyoverNonce((n) => n + 1)}
         maintenance={maintenance}
         onMaintenanceToggle={() => setMaintenance((m) => !m)}
-        theme={theme}
-        onThemeChange={setThemeChoice}
         range={rangeMs}
         onRangeChange={setRangeMs}
         axisUnits={axisUnits}

@@ -1,11 +1,11 @@
 // Tietoja-ruutu: peittää koko julkisen näkymän kun operaattori kytkee sen päältä
-// ohjauspaneelista. Brändi- ja tekijäsivu: PORI SPACE LAB -sanamerkki,
-// valinnainen iskulause, tekijälista sekä valinnaiset kumppanilogot ja linkit.
+// ohjauspaneelista. Brändi- ja esittelysivu: PORI SPACE LAB -sanamerkki,
+// valinnainen iskulause, esittelyteksti sekä valinnaiset kumppanilogot ja linkit.
 //
 // ── TÄYTÄ TÄHÄN ──────────────────────────────────────────────────────────────
 // Kaikki sisältö tulee alla olevista vakioista — muuta vain näitä, ei JSX:ää.
 //  • TAGLINE: jätä tyhjäksi ('') jos et halua iskulausetta.
-//  • CREDITS: tekijät { name, role }. Lisää/poista rivejä vapaasti.
+//  • ABOUT: esittelytekstin kappaleet. Lisää/poista rivejä vapaasti.
 //  • LOGOS: kumppani-/sponsorilogot. Pudota kuvatiedostot public-kansioon ja
 //    viittaa niihin juuripolulla (esim. '/logo.png' → public/logo.png).
 //    Tyhjä lista = ei logoriviä.
@@ -16,12 +16,11 @@ const LOGO = 'PORI SPACE LAB';
 
 const TAGLINE = '';
 
-// Tekijät — korvaa esimerkkirivit oikeilla nimillä ja rooleilla.
-const CREDITS = [
-  { name: 'Nimi Nimetön', role: 'Projektin johto' },
-  { name: 'Nimi Nimetön', role: 'Laitteisto' },
-  { name: 'Nimi Nimetön', role: 'Ohjelmisto' },
-  { name: 'Nimi Nimetön', role: 'Maa-asema' },
+// Esittelyteksti — mikä sivu on, miksi se on tehty ja kenen toimesta.
+const ABOUT = [
+  'Tämä on julkinen seurantasivu Pori Space Labin KitSat-satelliitin laukaisulle Suomi Areena 2026 -tapahtumassa Porissa. Täältä voit seurata satelliitin kulkua ja telemetriaa reaaliajassa.',
+  'Laukaisu on samalla Pori Space Labin virallinen avaus.',
+  'Sivuston ja satelliitin ovat toteuttaneet SAMKin opiskelijat yhteistyössä Turun yliopiston kanssa.',
 ];
 
 // Kumppani-/sponsorilogot — esim. [{ src: '/logo.png', alt: 'Kumppani' }].
@@ -45,17 +44,11 @@ export default function MaintenanceOverlay() {
           </div>
         )}
 
-        {CREDITS.length > 0 && (
-          <div className="maintenance-credits">
-            <span className="maintenance-credits-title">Tekijät</span>
-            <ul className="maintenance-credit-list">
-              {CREDITS.map((c, i) => (
-                <li key={`${c.name}-${i}`} className="maintenance-credit">
-                  <span className="maintenance-credit-name">{c.name}</span>
-                  <span className="maintenance-credit-role">{c.role}</span>
-                </li>
-              ))}
-            </ul>
+        {ABOUT.length > 0 && (
+          <div className="maintenance-about">
+            {ABOUT.map((p, i) => (
+              <p key={i} className="maintenance-about-text">{p}</p>
+            ))}
           </div>
         )}
 

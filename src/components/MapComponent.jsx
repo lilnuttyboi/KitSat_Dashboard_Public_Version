@@ -53,6 +53,7 @@ function MapEffects({ lat, lng, route, recenterNonce, onFollowingChange }) {
   const targetRef = useRef({ lat, lng, route });
   const followingRef = useRef(true); // seurataanko satelliittia juuri nyt
   const selfMoveRef = useRef(false); // tosi kun me siirrämme karttaa ohjelmallisesti
+  const hasFittedRef = useRef(false); // onko näkymä sovitettu vähintään kerran
 
   useEffect(() => {
     targetRef.current = { lat, lng, route };
@@ -85,9 +86,11 @@ function MapEffects({ lat, lng, route, recenterNonce, onFollowingChange }) {
     }
     points.push([tLat, tLng]);
     selfMoveRef.current = true; // merkitse oma siirto, jottei sitä lueta käyttäjän eleeksi
+    // Pienemmillä näytöillä pienempi reunus, ettei näkymä zoomaa liian kauas.
+    const padPx = map.getSize().x < 480 ? 24 : 48;
     if (points.length >= 2) {
       map.fitBounds(L.latLngBounds(points), {
-        padding: [48, 48],
+        padding: [padPx, padPx],
         maxZoom: FOLLOW_MAX_ZOOM,
         animate: true,
         duration: 0.5,
@@ -100,22 +103,40 @@ function MapEffects({ lat, lng, route, recenterNonce, onFollowingChange }) {
     }
   }, [map]);
 
+  // Onko satelliitti vielä nykyisessä näkymässä? Sovitus kehystää koko reitin,
+  // jolloin tuorein piste jää näkymän reunamille — siksi tarkistetaan vain
+  // täydet rajat (ei kutistettuja), ettei sovitus laukeaisi heti uudelleen joka
+  // päivityksellä (juuri se aiheutti itsestään zoomaamisen).
+  const targetVisible = useCallback(() => {
+    const { lat: tLat, lng: tLng } = targetRef.current;
+    if (tLat == null || tLng == null) return false;
+    return map.getBounds().contains(L.latLng(tLat, tLng));
+  }, [map]);
+
   // Käyttäjän ele keskeyttää seurannan. Seuranta pysyy poissa kunnes käyttäjä
   // painaa "Keskitä satelliittiin" -nappia (ainoa manuaalinen palautus).
   const pauseFollow = useCallback(() => {
     if (followingRef.current) setFollowing(false);
   }, [setFollowing]);
 
-  // Seuraa satelliittia: joka päivityksellä sovita näkymä, jos seuranta on päällä.
+  // Seuraa satelliittia, mutta sovita näkymä vain ensilatauksella tai kun
+  // satelliitti on ajautumassa pois näkyvistä. Näin kartta ei zoomaa itsestään
+  // joka päivityksellä, mutta pitää satelliitin aina näkyvissä myös korkealla,
+  // kun se ajautuu kauas (100–200 km).
   useEffect(() => {
     if (lat == null || lng == null) return;
-    if (followingRef.current) fitToTarget();
-  }, [lat, lng, route, fitToTarget]);
+    if (!followingRef.current) return;
+    if (!hasFittedRef.current || !targetVisible()) {
+      hasFittedRef.current = true;
+      fitToTarget();
+    }
+  }, [lat, lng, route, fitToTarget, targetVisible]);
 
   // "Keskitä satelliittiin" -nappi: jatka seurantaa ja sovita näkymä heti.
   useEffect(() => {
     if (recenterNonce === 0) return; // ei laukaista ensirenderissä
     setFollowing(true);
+    hasFittedRef.current = true;
     fitToTarget();
   }, [recenterNonce, setFollowing, fitToTarget]);
 

@@ -1,6 +1,6 @@
 // Ohjauspaneeli (Asetukset): kelluva, raahattava paneeli koontinäytön päällä
 // samassa välilehdessä. Napit näkymälle (2D/3D), pohjakartalle, kameralle,
-// teemalle, kaavioiden aikavälille, Y-akselin asteikolle ja tietoja-ruudulle.
+// kaavioiden aikavälille, Y-akselin asteikolle ja tietoja-ruudulle.
 // Tila ja takaisinkutsut tulevat isännältä (App). Pysyy auki kunnes suljetaan.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -25,7 +25,14 @@ function readPos() {
   try {
     const raw = localStorage.getItem(POS_KEY);
     const p = raw ? JSON.parse(raw) : null;
-    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) return p;
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+      // Rajaa nykyiseen ikkunaan: työpöydällä tallennettu sijainti jäisi muuten
+      // mobiiliruudun ulkopuolelle, eikä paneeli näkyisi lainkaan.
+      return {
+        x: clamp(p.x, 0, Math.max(0, window.innerWidth - PANEL_W)),
+        y: clamp(p.y, 0, Math.max(0, window.innerHeight - 80)),
+      };
+    }
   } catch (e) {
     void e; // viallinen tai estetty tallennus — käytetään oletusta
   }
@@ -51,8 +58,6 @@ export default function ControlPanel({
   onFlyover,
   maintenance,
   onMaintenanceToggle,
-  theme,
-  onThemeChange,
   range,
   onRangeChange,
   axisUnits,
@@ -188,24 +193,6 @@ export default function ControlPanel({
         <button className="range-btn control-wide" onClick={onReset} disabled={is2d}>
           Palauta näkymä
         </button>
-
-        <div className="control-section">
-          <span className="control-label">Teema</span>
-          <div className="control-row">
-            <button
-              className={`range-btn${theme === 'dark' ? ' active' : ''}`}
-              onClick={() => onThemeChange('dark')}
-            >
-              Tumma
-            </button>
-            <button
-              className={`range-btn${theme === 'light' ? ' active' : ''}`}
-              onClick={() => onThemeChange('light')}
-            >
-              Vaalea
-            </button>
-          </div>
-        </div>
 
         <div className="control-section">
           <span className="control-label">Aikaväli</span>

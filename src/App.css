@@ -19,32 +19,13 @@
   color-scheme: dark;
 }
 
-/* Vaalea teema: sama paletti vaaleana, tummemmat korostusvärit jotta
-   kontrasti riittää vaalealla pohjalla. */
-[data-theme='light'] {
-  --bg-color: #f7fafc;
-  --card-bg: rgba(255, 255, 255, 0.92);
-  --header-bg: rgba(11, 15, 26, 0.95);
-  --border: rgba(15, 23, 42, 0.12);
-  --primary: #b45309;
-  --primary-glow: rgba(180, 83, 9, 0.2);
-  --accent: #0369a1;
-  --success: #047857;
-  --error: #be123c;
-  --text-main: #000;
-  --text-muted: #000;
-  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.12), 0 4px 6px -4px rgba(15, 23, 42, 0.12);
-  --chart-grid: rgba(15, 23, 42, 0.13);
-  color-scheme: light;
-}
-
 body, html {
   margin: 0;
   padding: 0;
   font-family: var(--font-sans);
   /* Avaruusteema (porispacelab.fi): tähtitaivas CSS:llä — lähes
      huomaamattomat tähtisumupilvet + kolmen kokoluokan tähdet
-     toistuvana kuviona. Sama tausta molemmissa teemoissa. */
+     toistuvana kuviona. */
   background-color: #04060f;
   background-image:
     radial-gradient(circle at 22% 20%, rgba(80, 100, 180, 0.05) 0%, transparent 45%),
@@ -64,7 +45,7 @@ body, html {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Latausruutu istuu tähtitaivaalle molemmissa teemoissa */
+/* Latausruutu istuu tähtitaivaalle */
 .loading {
   padding: 4rem 1rem;
   text-align: center;
@@ -143,16 +124,6 @@ body, html {
   letter-spacing: 0.14em; /* Orbitron on leveä fontti, maltillisempi harvennus */
   text-transform: uppercase;
   color: #fff;
-}
-
-/* Header on aina tumma (kuten porispacelab.fi:n yläpalkki) — vaalealla
-   teemalla sen sisällä käytetään tumman teeman tekstivärejä. */
-[data-theme='light'] .dashboard-header {
-  --header-bg: rgba(11, 15, 26, 0.95);
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --border: rgba(255, 255, 255, 0.1);
-  --primary: #fbbf24;
 }
 
 /* Layout Grid */
@@ -342,19 +313,11 @@ body, html {
   background: #111 !important;
 }
 
-[data-theme='light'] .leaflet-container {
-  background: #d8dee8 !important;
-}
-
-/* Dark: CARTO dark_all on lähes musta — kirkastetaan, jotta tiet ja nimistö
-   erottuvat. Light: Voyager toimii sellaisenaan. Suodatin vain
-   tiilikerrokseen, jotta markkeri ja reittiviiva säilyttävät värinsä. */
+/* CARTO dark_all on lähes musta — kirkastetaan, jotta tiet ja nimistö
+   erottuvat. Suodatin vain tiilikerrokseen, jotta markkeri ja reittiviiva
+   säilyttävät värinsä. */
 .leaflet-container .leaflet-tile-pane {
   filter: brightness(2.4) contrast(1.15) saturate(1.3);
-}
-
-[data-theme='light'] .leaflet-container .leaflet-tile-pane {
-  filter: none;
 }
 
 /* Satelliittipohjalla kirkastussuodatin ei sovi — kuvat ovat jo täysivärisiä. */
@@ -508,18 +471,6 @@ body, html {
   100% { opacity: 1; }
 }
 
-/* Vaalean teeman korjaukset komponenteille, joilla on kovakoodattu tumma
-   tausta, sekä kaavioiden apuviivat (recharts asettaa värin attribuuttina,
-   joten teemakohtainen väri vaihdetaan CSS:llä). */
-[data-theme='light'] .map-wrapper::after {
-  box-shadow: inset 0 0 30px rgba(15, 23, 42, 0.15);
-}
-
-/* Vaalealla teemalla suuri korkeuslukema on musta valkoisen sijaan. */
-[data-theme='light'] .value-large {
-  color: #000;
-}
-
 .recharts-cartesian-grid line {
   stroke: var(--chart-grid);
 }
@@ -648,8 +599,7 @@ body, html {
 }
 
 /* ── Asetuspaneeli (kelluva, raahattava, samassa välilehdessä) ──────────
-   Aina tumma pohja (kuten yläpalkki), joten värit kovakoodataan eikä sidota
-   teemamuuttujiin (jotka vaalealla muuttuisivat mustiksi). z-index tietoja-
+   Tumma pohja (kuten yläpalkki); värit kovakoodataan. z-index tietoja-
    ruudun (1500) yläpuolella, jotta paneeli toimii myös sen päällä. */
 .control-window {
   position: fixed;
@@ -734,7 +684,7 @@ body, html {
   color: #94a3b8;
 }
 
-/* Paneelin napit tummalla pohjalla — kirkkaat värit molemmissa teemoissa. */
+/* Paneelin napit tummalla pohjalla — kirkkaat värit. */
 .control-window .range-btn {
   color: #94a3b8;
   border-color: rgba(255, 255, 255, 0.18);
@@ -813,18 +763,20 @@ body, html {
 }
 
 /* ── Huoltoruutu (Pori Space Lab -splash) ──────────────────────────────
-   Aina tumma/avaruusteema riippumatta käyttöliittymän teemasta; värit
-   kovakoodataan, ettei vaalea teema tee tekstistä mustaa tummalla pohjalla.
+   Tumma avaruusteema; värit kovakoodataan.
    z-index 1500 < ohjauspaneelin 2000, joten paneelilla pääsee pois. */
 .maintenance-overlay {
   position: fixed;
   inset: 0;
   z-index: 1500;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 2rem;
+  /* Salli pystyvieritys, jos sisältö ei mahdu pienelle/matalalle näytölle. */
+  overflow-y: auto;
   background:
     radial-gradient(circle at 50% 38%, rgba(80, 100, 180, 0.14) 0%, transparent 55%),
     #04060f;
@@ -836,17 +788,24 @@ body, html {
   align-items: center;
   gap: 1rem;
   max-width: 40rem;
+  /* Auto-marginaalit keskittävät pystysuunnassa kun tilaa on, mutta sallivat
+     vierityksen ilman että yläreuna leikkautuu (toisin kuin justify-content). */
+  margin: auto 0;
 }
-/* PORI SPACE LAB -sanamerkki, yhdellä rivillä. */
+/* PORI SPACE LAB -sanamerkki, yhdellä rivillä isoilla näytöillä. */
 .maintenance-logo {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2.2rem, 7vw, 5rem);
+  font-size: clamp(1.7rem, 7vw, 5rem);
   font-weight: 700;
   letter-spacing: 0.12em;
   line-height: 0.95;
   color: #fff;
   white-space: nowrap; /* "PORI SPACE LAB" pysyy yhdellä rivillä */
+}
+/* Hyvin kapeilla näytöillä sanamerkki saa katketa kahdelle riville. */
+@media (max-width: 360px) {
+  .maintenance-logo { white-space: normal; }
 }
 /* Valinnainen iskulause (näkyy vain kun TAGLINE on asetettu). */
 .maintenance-tagline {
@@ -872,46 +831,20 @@ body, html {
   object-fit: contain;
 }
 
-/* Tekijälista. */
-.maintenance-credits {
+/* Esittelyteksti: kappaleet allekkain, leveys rajattu luettavuuden vuoksi. */
+.maintenance-about {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 1rem;
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
+  max-width: 34rem;
 }
-.maintenance-credits-title {
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: #64748b;
-}
-.maintenance-credit-list {
-  list-style: none;
+.maintenance-about-text {
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-.maintenance-credit {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-.maintenance-credit-name {
-  font-family: var(--font-display);
-  font-size: clamp(1rem, 2.4vw, 1.5rem);
-  font-weight: 600;
-  color: #f1f5f9;
-}
-.maintenance-credit-role {
-  font-family: var(--font-mono);
-  font-size: clamp(0.7rem, 1.6vw, 0.95rem);
-  letter-spacing: 0.1em;
-  color: #94a3b8;
+  font-family: var(--font-sans);
+  font-size: clamp(0.95rem, 2.4vw, 1.15rem);
+  line-height: 1.7;
+  color: #cbd5e1;
 }
 
 /* Valinnaiset linkit (näkyy vain kun LINKS ei ole tyhjä). */
