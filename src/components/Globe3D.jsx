@@ -24,7 +24,7 @@ const VIEW_HEADING_DEG = 35;   // Sivu-tilan sivukulma
 const VIEW_PITCH_DEG = -4;     // Sivu-tilan loiva alaspäin
 const VIEW_BASE_RANGE = 4000;  // m, vähimmäisetäisyys kohteeseen
 const ORBIT_PITCH_DEG = -20;   // Kierto: katsekulma
-const ORBIT_DEG_PER_SEC = 8;   // Kierto: täysi kierros ~45 s
+const ORBIT_DEG_PER_SEC = 1.5; // Kierto: hidas, täysi kierros ~240 s
 const TOP_PITCH_DEG = -89;     // Ylhäältä: lähes suoraan alas (ei tasan -90)
 const TOP_HEADING_DEG = 0;     // Ylhäältä: pohjoinen ylös
 const TOP_RANGE_FACTOR = 1.5;  // Ylhäältä istuu hieman lähempänä kuin sivu (2.2)
@@ -245,6 +245,12 @@ function Globe3D({
 
         viewer.scene.globe.depthTestAgainstTerrain = false;
         viewer.cesiumWidget.creditContainer.style.display = 'none';
+
+        // Kierto-tila ajoittaa pyörimisen viewer.clock.currentTime'iin, joka etenee
+        // vain kun kello animoi. Cesiumin oletus on shouldAnimate=false (eikä
+        // animation-widgettiä ole sitä käynnistämässä), joten käynnistetään kello
+        // käsin — muuten kierto jää paikalleen tuijottamaan satelliittia.
+        viewer.clock.shouldAnimate = true;
 
         // Pehmeämpi zoom/pyöritys, ei inertiaa.
         const sscc = viewer.scene.screenSpaceCameraController;
