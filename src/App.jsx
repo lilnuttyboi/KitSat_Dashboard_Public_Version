@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useTelemetry } from './hooks/useTelemetry';
+import { useMediaQuery } from './hooks/useMediaQuery';
 import LatestImage from './components/LatestImage';
 import FlightTimer from './components/FlightTimer';
 import MaintenanceOverlay from './components/MaintenanceOverlay';
@@ -92,6 +93,12 @@ function App() {
   useEffect(() => {
     writePersistedState({ mapMode, basemap, cameraMode, maintenance, theme, range: rangeMs, axisUnits });
   }, [mapMode, basemap, cameraMode, maintenance, theme, rangeMs, axisUnits]);
+
+  // Pienillä näytöillä (puhelin/tabletti) pakotetaan 2D-kartta: 3D-pallo
+  // (Cesium) on raskas ladata ja kuluttaa akkua. Tallennettua mapMode-valintaa
+  // ei ylikirjoiteta, joten työpöydällä 3D palaa käyttöön.
+  const isCompact = useMediaQuery('(max-width: 1100px)');
+  const effectiveMapMode = isCompact ? '2d' : mapMode;
 
   const route = useMemo(() => buildRoute(history), [history]);
   const route3d = useMemo(() => buildRoute3d(history), [history]);
@@ -198,7 +205,7 @@ function App() {
           <div className="glass-card map-section">
             {/* Karttatyyppi (2D/3D) valitaan vain ohjauspaneelista — ei kartalla. */}
             <Suspense fallback={<div className="globe-overlay">LADATAAN KARTTAA…</div>}>
-              {mapMode === '3d' ? (
+              {effectiveMapMode === '3d' ? (
                 <Globe3D
                   lat={telemetry?.gps_fix ? telemetry.gps_lat : null}
                   lng={telemetry?.gps_fix ? telemetry.gps_lon : null}
@@ -259,6 +266,7 @@ function App() {
         Renderöidään juuritasolla (z-index tietoja-ruudun yläpuolella). */}
     {controlOpen && (
       <ControlPanel
+        compact={isCompact}
         mapMode={mapMode}
         onMapModeChange={setMapMode}
         basemap={basemap}

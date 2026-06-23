@@ -507,6 +507,10 @@ body, html {
      nollata — muuten selain luo niille implisiittisiä sarakkeita ja
      layout vuotaa vaakasuunnassa näytön ulkopuolelle. */
   .altitude-section, .map-section, .left-metrics, .right-metrics { grid-area: auto; }
+  /* Puhelin/tabletti: kartta ensimmäiseksi kortiksi (ennen korkeutta ja
+     mittareita). order toimii, koska yksisarakkeisessa gridissä kortit
+     asetellaan DOM-järjestyksen sijaan order-arvon mukaan. */
+  .map-section { order: -1; }
   /* Status ja lentoaika näkyvissä myös skrollatessa */
   .dashboard-header { position: sticky; top: 0; }
   .altitude-section, .map-section { min-height: 400px; }

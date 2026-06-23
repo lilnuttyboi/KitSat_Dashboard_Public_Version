@@ -48,6 +48,7 @@ function writePos(pos) {
 }
 
 export default function ControlPanel({
+  compact,
   mapMode,
   onMapModeChange,
   basemap,
@@ -123,23 +124,26 @@ export default function ControlPanel({
       </div>
 
       <div className="control-body">
-        <div className="control-section">
-          <span className="control-label">Näkymä</span>
-          <div className="control-row">
-            <button
-              className={`range-btn${mapMode === '3d' ? ' active' : ''}`}
-              onClick={() => onMapModeChange('3d')}
-            >
-              3D
-            </button>
-            <button
-              className={`range-btn${mapMode === '2d' ? ' active' : ''}`}
-              onClick={() => onMapModeChange('2d')}
-            >
-              2D
-            </button>
+        {/* 2D/3D-valinta piilotetaan pienillä näytöillä — siellä on aina 2D. */}
+        {!compact && (
+          <div className="control-section">
+            <span className="control-label">Näkymä</span>
+            <div className="control-row">
+              <button
+                className={`range-btn${mapMode === '3d' ? ' active' : ''}`}
+                onClick={() => onMapModeChange('3d')}
+              >
+                3D
+              </button>
+              <button
+                className={`range-btn${mapMode === '2d' ? ' active' : ''}`}
+                onClick={() => onMapModeChange('2d')}
+              >
+                2D
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="control-section">
           <span className="control-label">Pohjakartta</span>
@@ -159,40 +163,46 @@ export default function ControlPanel({
           </div>
         </div>
 
-        <div className={`control-section${is2d ? ' disabled' : ''}`}>
-          <span className="control-label">Kamera</span>
-          <div className="control-row">
-            <button
-              className={`range-btn${cameraMode === 'sivu' ? ' active' : ''}`}
-              onClick={() => onCameraModeChange('sivu')}
-              disabled={is2d}
-            >
-              Sivu
-            </button>
-            <button
-              className={`range-btn${cameraMode === 'kierto' ? ' active' : ''}`}
-              onClick={() => onCameraModeChange('kierto')}
-              disabled={is2d}
-            >
-              Kierto
-            </button>
-            <button
-              className={`range-btn${cameraMode === 'ylha' ? ' active' : ''}`}
-              onClick={() => onCameraModeChange('ylha')}
-              disabled={is2d}
-            >
-              Ylhäältä
-            </button>
-          </div>
-          <button className="range-btn control-wide" onClick={onFlyover} disabled={is2d}>
-            Lento
-          </button>
-          {is2d && <span className="control-hint">Kameratilat ovat käytössä vain 3D-kartalla.</span>}
-        </div>
+        {/* Kameratilat ja näkymän palautus koskevat vain 3D:tä — piilotetaan
+            pienillä näytöillä, joissa kartta on aina 2D. */}
+        {!compact && (
+          <>
+            <div className={`control-section${is2d ? ' disabled' : ''}`}>
+              <span className="control-label">Kamera</span>
+              <div className="control-row">
+                <button
+                  className={`range-btn${cameraMode === 'sivu' ? ' active' : ''}`}
+                  onClick={() => onCameraModeChange('sivu')}
+                  disabled={is2d}
+                >
+                  Sivu
+                </button>
+                <button
+                  className={`range-btn${cameraMode === 'kierto' ? ' active' : ''}`}
+                  onClick={() => onCameraModeChange('kierto')}
+                  disabled={is2d}
+                >
+                  Kierto
+                </button>
+                <button
+                  className={`range-btn${cameraMode === 'ylha' ? ' active' : ''}`}
+                  onClick={() => onCameraModeChange('ylha')}
+                  disabled={is2d}
+                >
+                  Ylhäältä
+                </button>
+              </div>
+              <button className="range-btn control-wide" onClick={onFlyover} disabled={is2d}>
+                Lento
+              </button>
+              {is2d && <span className="control-hint">Kameratilat ovat käytössä vain 3D-kartalla.</span>}
+            </div>
 
-        <button className="range-btn control-wide" onClick={onReset} disabled={is2d}>
-          Palauta näkymä
-        </button>
+            <button className="range-btn control-wide" onClick={onReset} disabled={is2d}>
+              Palauta näkymä
+            </button>
+          </>
+        )}
 
         <div className="control-section">
           <span className="control-label">Aikaväli</span>
