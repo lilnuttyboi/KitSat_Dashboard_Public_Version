@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -42,18 +42,104 @@ const ESRI_SATELLITE_URL =
 const ESRI_LABELS_URL =
   'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 
-function MapEffects({ lat, lng }) {
+// Lähin sallittu zoom-taso automaattisovituksessa: estää liiallisen
+// lähentymisen kun reitti on vasta muutaman metrin mittainen.
+const FOLLOW_MAX_ZOOM = 15;
+
+function MapEffects({ lat, lng, route, recenterNonce, onFollowingChange }) {
   const map = useMap();
+  // Tuoreimmat arvot refeissä, jotta kerran rekisteröidyt käsittelijät lukevat
+  // aina viimeisimmän kohteen ilman uudelleenrekisteröintiä.
+  const targetRef = useRef({ lat, lng, route });
+  const followingRef = useRef(true); // seurataanko satelliittia juuri nyt
+  const selfMoveRef = useRef(false); // tosi kun me siirrämme karttaa ohjelmallisesti
+
+  useEffect(() => {
+    targetRef.current = { lat, lng, route };
+  }, [lat, lng, route]);
+
   useEffect(() => {
     const t = setTimeout(() => map.invalidateSize(), 0);
     return () => clearTimeout(t);
   }, [map]);
+
+  // Asettaa seurantatilan ja ilmoittaa siitä yläkomponentille (napin näkyvyys).
+  const setFollowing = useCallback(
+    (value) => {
+      followingRef.current = value;
+      onFollowingChange?.(value);
+    },
+    [onFollowingChange]
+  );
+
+  // Sovittaa näkymän satelliittiin + koko reittiin. Näkymä levenee itsestään kun
+  // pallo nousee ja ajautuu kauas; maxZoom estää liiallisen lähentymisen alussa.
+  const fitToTarget = useCallback(() => {
+    const { lat: tLat, lng: tLng, route: tRoute } = targetRef.current;
+    if (tLat == null || tLng == null) return;
+    const points = [];
+    if (Array.isArray(tRoute)) {
+      for (const p of tRoute) {
+        if (Array.isArray(p) && p[0] != null && p[1] != null) points.push(p);
+      }
+    }
+    points.push([tLat, tLng]);
+    selfMoveRef.current = true; // merkitse oma siirto, jottei sitä lueta käyttäjän eleeksi
+    if (points.length >= 2) {
+      map.fitBounds(L.latLngBounds(points), {
+        padding: [48, 48],
+        maxZoom: FOLLOW_MAX_ZOOM,
+        animate: true,
+        duration: 0.5,
+      });
+    } else {
+      map.setView([tLat, tLng], Math.min(map.getZoom(), FOLLOW_MAX_ZOOM), {
+        animate: true,
+        duration: 0.5,
+      });
+    }
+  }, [map]);
+
+  // Käyttäjän ele keskeyttää seurannan. Seuranta pysyy poissa kunnes käyttäjä
+  // painaa "Keskitä satelliittiin" -nappia (ainoa manuaalinen palautus).
+  const pauseFollow = useCallback(() => {
+    if (followingRef.current) setFollowing(false);
+  }, [setFollowing]);
+
+  // Seuraa satelliittia: joka päivityksellä sovita näkymä, jos seuranta on päällä.
   useEffect(() => {
     if (lat == null || lng == null) return;
-    const c = map.getCenter();
-    if (c.lat === lat && c.lng === lng) return;
-    map.setView([lat, lng], map.getZoom());
-  }, [lat, lng, map]);
+    if (followingRef.current) fitToTarget();
+  }, [lat, lng, route, fitToTarget]);
+
+  // "Keskitä satelliittiin" -nappi: jatka seurantaa ja sovita näkymä heti.
+  useEffect(() => {
+    if (recenterNonce === 0) return; // ei laukaista ensirenderissä
+    setFollowing(true);
+    fitToTarget();
+  }, [recenterNonce, setFollowing, fitToTarget]);
+
+  // Erota käyttäjän eleet omista ohjelmallisista siirroista: ohjelmalliset
+  // merkitään selfMoveRefillä ja nollataan moveend-tapahtumassa. Raahaus on aina
+  // käyttäjän ele (ei laukea ohjelmallisesti), zoom vain kun selfMove ei ole päällä.
+  useEffect(() => {
+    const onMoveEnd = () => {
+      selfMoveRef.current = false;
+    };
+    const onDragStart = () => pauseFollow();
+    const onZoomStart = () => {
+      if (!selfMoveRef.current) pauseFollow();
+    };
+    map.on('moveend', onMoveEnd);
+    map.on('dragstart', onDragStart);
+    map.on('zoomstart', onZoomStart);
+    return () => {
+      map.off('moveend', onMoveEnd);
+      map.off('dragstart', onDragStart);
+      map.off('zoomstart', onZoomStart);
+    };
+  }, [map, pauseFollow]);
+
   return null;
 }
 
@@ -64,6 +150,10 @@ const MapComponent = memo(({ lat, lng, route = [], theme = 'dark', basemap = 'sa
   const [initialCenter] = useState(() => (hasValidCoords ? [lat, lng] : DEFAULT_CENTER));
   const markerPosition = useMemo(() => [lat ?? 0, lng ?? 0], [lat, lng]);
   const showRoute = route.length >= 2;
+  // Seurantatila nostettu tänne napin näkyvyyttä varten; nappi pyytää
+  // uudelleenkeskityksen nostamalla noncea, jonka MapEffects havaitsee.
+  const [following, setFollowing] = useState(true);
+  const [recenterNonce, setRecenterNonce] = useState(0);
 
   return (
     <div className={`map-wrapper${basemap === 'satellite' ? ' map-wrapper--satellite' : ''}`}>
@@ -113,8 +203,25 @@ const MapComponent = memo(({ lat, lng, route = [], theme = 'dark', basemap = 'sa
             </Popup>
           </Marker>
         )}
-        <MapEffects lat={lat} lng={lng} />
+        <MapEffects
+          lat={lat}
+          lng={lng}
+          route={route}
+          recenterNonce={recenterNonce}
+          onFollowingChange={setFollowing}
+        />
       </MapContainer>
+      {/* Ainoa manuaalinen säädin: näkyy vain kun käyttäjä on siirtänyt karttaa
+          pois seurannasta. Palauttaa seurannan ja keskittää satelliittiin. */}
+      {!following && hasValidCoords && (
+        <button
+          type="button"
+          className="map-recenter-btn"
+          onClick={() => setRecenterNonce((n) => n + 1)}
+        >
+          Keskitä satelliittiin
+        </button>
+      )}
     </div>
   );
 });

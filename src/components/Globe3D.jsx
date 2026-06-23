@@ -116,6 +116,37 @@ function toCartesians(Cesium, route3d) {
     );
 }
 
+// Säätää hiirisyötteen kameratilan mukaan. Kaikissa tiloissa zoom on sallittu ja
+// satelliitti pysyy keskellä: panorointi ja vapaa katselu on estetty, jottei
+// kohde karkaa kuvasta. Kierto-tilassa myös pyöritys/kallistus on lukittu, koska
+// kamera pyörii automaattisesti (käyttäjän ele ei taistele sitä vastaan).
+function setCameraInputs(sscc, mode) {
+  const manualOrbit = mode !== 'kierto';
+  sscc.enableRotate = manualOrbit;
+  sscc.enableTilt = manualOrbit;
+  sscc.enableLook = false;
+  sscc.enableTranslate = false;
+  sscc.enableZoom = true;
+}
+
+// Lukitsee kameran seuraamaan satelliittia sen NYKYISESTÄ katselukulmasta:
+// lukee kameran sijainnin satelliitin ENU-kehyksessä ja asettaa sen entiteetin
+// viewFrom-arvoksi, minkä jälkeen trackedEntity seuraa liikettä. Käyttäjä saa
+// pyörittää/zoomata vapaasti ilman että kohde karkaa kuvasta. Koska viewFrom
+// luetaan kameran nykyisestä asennosta, seurantaan siirtyminen ei nykäise.
+function lockTracking(Cesium, viewer, craftPos, craftEntity) {
+  if (!craftPos || !craftEntity) return;
+  const enuToFixed = Cesium.Transforms.eastNorthUpToFixedFrame(craftPos);
+  const fixedToEnu = Cesium.Matrix4.inverseTransformation(enuToFixed, new Cesium.Matrix4());
+  const offset = Cesium.Matrix4.multiplyByPoint(
+    fixedToEnu,
+    viewer.camera.positionWC,
+    new Cesium.Cartesian3()
+  );
+  craftEntity.viewFrom = offset;
+  viewer.trackedEntity = craftEntity;
+}
+
 function Globe3D({
   lat,
   lng,
@@ -136,11 +167,10 @@ function Globe3D({
   const altRef = useRef(0);             // viimeisin korkeus kameran etäisyyttä varten
   const basemapRef = useRef(basemap);   // tuorein pohjakartta async-alustusta varten
   const themeRef = useRef(theme);       // tuorein teema async-alustusta varten
-  const autoTrackRef = useRef(false);   // seuraako kamera satelliittia
+  const autoOrbitRef = useRef(false);   // pyöriikö kamera automaattisesti (kierto-tila)
   const didFirstFlyRef = useRef(false);
   const cameraModeRef = useRef(cameraMode); // preRender lukee aina tuoreimman tilan
   const orbitStartRef = useRef(null);       // Cesium.JulianDate: kierron alkuhetki
-  const lentoFollowRef = useRef(false);     // "lento"-seuranta lukittu kunnes reset
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
 
   // Lentää valitun kameratilan asentoon ja kytkee seurannan päälle.
@@ -149,17 +179,36 @@ function Globe3D({
     const Cesium = cesiumRef.current;
     const viewer = viewerRef.current;
     if (!Cesium || !viewer || viewer.isDestroyed() || !craftPosRef.current) return;
+    const mode = cameraModeRef.current;
+    // Vapauta edellinen seuranta ja mahdollinen lukittu transform ennen lentoa.
+    viewer.trackedEntity = undefined;
     viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-    autoTrackRef.current = false;
-    lentoFollowRef.current = false; // reset/uudelleenkehystys lopettaa lento-seurannan
-    if (cameraModeRef.current === 'kierto') {
-      orbitStartRef.current = Cesium.JulianDate.clone(viewer.clock.currentTime);
+    autoOrbitRef.current = false;
+    setCameraInputs(viewer.scene.screenSpaceCameraController, mode);
+
+    if (mode === 'kierto') {
+      // Kierto: lennä aloituskulmaan ja käynnistä automaattinen pyöriminen vasta
+      // kun lento on asettunut (preRender hoitaa pyörimisen).
+      viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(craftPosRef.current, 1), {
+        offset: poseForMode(Cesium, 'kierto', altRef.current),
+        duration: 1.5,
+        complete: () => {
+          if (viewer.isDestroyed()) return;
+          orbitStartRef.current = Cesium.JulianDate.clone(viewer.clock.currentTime);
+          autoOrbitRef.current = true;
+        },
+      });
+      return;
     }
+
+    // Sivu / Ylhäältä: lennä tilan kulmaan ja lukitse seuranta tästä kulmasta →
+    // satelliitti pysyy keskellä, mutta käyttäjä saa pyörittää/zoomata vapaasti.
     viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(craftPosRef.current, 1), {
-      offset: poseForMode(Cesium, cameraModeRef.current, altRef.current),
+      offset: poseForMode(Cesium, mode, altRef.current),
       duration: 1.5,
       complete: () => {
-        autoTrackRef.current = true;
+        if (viewer.isDestroyed()) return;
+        lockTracking(Cesium, viewer, craftPosRef.current, craftEntityRef.current);
       },
     });
     // Tyhjä dep-taulukko on tarkoituksellinen: funktio lukee kameratilan ja
@@ -204,6 +253,13 @@ function Globe3D({
         sscc.inertiaTranslate = 0;
         sscc.minimumZoomDistance = 30;
         sscc.maximumZoomDistance = 4.0e7;
+        // Kamera seuraa satelliittia trackedEntityn kautta, mutta käyttäjä saa
+        // pyörittää ja zoomata vapaasti kohteen ympärillä. Panorointi/vapaa katselu
+        // on estetty, jotta satelliitti pysyy aina keskellä; kierto-tilassa pyöritys
+        // on automaattinen. Kamerakulman aloitus tulee ohjauspaneelin tiloista
+        // (sivu/kierto/ylhäältä/lento) ja "Palauta näkymä" -napista.
+        sscc.enableInputs = true;
+        setCameraInputs(sscc, cameraModeRef.current);
 
         // Lentorata (keltainen viiva).
         viewer.entities.add({
@@ -233,50 +289,26 @@ function Globe3D({
           },
         });
 
-        // Seuranta: joka ruudulla kamera asetetaan valitun tilan mukaan
-        // satelliitin ympärille. HeadingPitchRange luodaan kerran ja sen arvot
-        // päivittyvät tilan ja korkeuden mukana (vältetään GC-paine).
+        // Kierto-tila: joka ruudulla kamera kiertää satelliittia automaattisesti.
+        // Muut tilat seuraavat satelliittia trackedEntityn kautta (käyttäjän vapaa
+        // pyöritys/zoom säilyy), joten preRender ei tee niissä mitään.
+        // HeadingPitchRange luodaan kerran ja sen arvot päivittyvät (ei GC-painetta).
         const trackHpr = new Cesium.HeadingPitchRange(
           Cesium.Math.toRadians(VIEW_HEADING_DEG),
-          Cesium.Math.toRadians(VIEW_PITCH_DEG),
+          Cesium.Math.toRadians(ORBIT_PITCH_DEG),
           VIEW_BASE_RANGE
         );
         viewer.scene.preRender.addEventListener(() => {
-          if (!autoTrackRef.current || !craftPosRef.current) return;
-          const mode = cameraModeRef.current;
+          if (!autoOrbitRef.current || !craftPosRef.current) return;
           const a = altRef.current;
-          if (lentoFollowRef.current) {
-            // Lukittu lento-seuranta: vetäytynyt elokuvamainen kulma satelliittiin.
-            trackHpr.heading = Cesium.Math.toRadians(LENTO_FOLLOW_HEADING_DEG);
-            trackHpr.pitch = Cesium.Math.toRadians(LENTO_FOLLOW_PITCH_DEG);
-            trackHpr.range = VIEW_BASE_RANGE + (Number.isFinite(a) ? a : 0) * LENTO_FOLLOW_RANGE_FACTOR;
-          } else if (mode === 'kierto') {
-            const elapsed = orbitStartRef.current
-              ? Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, orbitStartRef.current)
-              : 0;
-            trackHpr.heading = Cesium.Math.toRadians(VIEW_HEADING_DEG + ORBIT_DEG_PER_SEC * elapsed);
-            trackHpr.pitch = Cesium.Math.toRadians(ORBIT_PITCH_DEG);
-            trackHpr.range = viewRange(a);
-          } else if (mode === 'ylha') {
-            trackHpr.heading = Cesium.Math.toRadians(TOP_HEADING_DEG);
-            trackHpr.pitch = Cesium.Math.toRadians(TOP_PITCH_DEG);
-            trackHpr.range = VIEW_BASE_RANGE + (Number.isFinite(a) ? a : 0) * TOP_RANGE_FACTOR;
-          } else {
-            trackHpr.heading = Cesium.Math.toRadians(VIEW_HEADING_DEG);
-            trackHpr.pitch = Cesium.Math.toRadians(VIEW_PITCH_DEG);
-            trackHpr.range = viewRange(a);
-          }
+          const elapsed = orbitStartRef.current
+            ? Cesium.JulianDate.secondsDifference(viewer.clock.currentTime, orbitStartRef.current)
+            : 0;
+          trackHpr.heading = Cesium.Math.toRadians(VIEW_HEADING_DEG + ORBIT_DEG_PER_SEC * elapsed);
+          trackHpr.pitch = Cesium.Math.toRadians(ORBIT_PITCH_DEG);
+          trackHpr.range = viewRange(a);
           viewer.camera.lookAt(craftPosRef.current, trackHpr);
         });
-
-        // Kun käyttäjä koskee karttaan, seuranta lopetetaan (ei taistella vastaan).
-        const stopTracking = () => {
-          if (!autoTrackRef.current) return;
-          autoTrackRef.current = false;
-          viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-        };
-        viewer.scene.canvas.addEventListener('pointerdown', stopTracking);
-        viewer.scene.canvas.addEventListener('wheel', stopTracking, { passive: true });
 
         setStatus('ready');
       })
@@ -337,19 +369,16 @@ function Globe3D({
     applyBasemap(Cesium, viewer, basemap, theme);
   }, [basemap, theme, status]);
 
-  // Pidä kameratila tuoreena preRenderille; kierto alkaa alusta tilaan tultaessa,
-  // ja tilan valinta jatkaa seurantaa (käyttäjän tahto seurata).
+  // Tilan vaihto: päivitä ref ja kehystä näkymä uudelleen valitulle tilalle.
+  // Ensimmäinen kehystys tapahtuu vasta kun sijainti saapuu (lat/lng-efekti).
   useEffect(() => {
     cameraModeRef.current = cameraMode;
-    lentoFollowRef.current = false; // tilan vaihto lopettaa lento-seurannan
     const Cesium = cesiumRef.current;
     const viewer = viewerRef.current;
     if (!Cesium || !viewer || viewer.isDestroyed() || status !== 'ready') return;
-    if (cameraMode === 'kierto') {
-      orbitStartRef.current = Cesium.JulianDate.clone(viewer.clock.currentTime);
-    }
-    if (craftPosRef.current) autoTrackRef.current = true;
-  }, [cameraMode, status]);
+    if (!craftPosRef.current) return;
+    flyToCurrentPose();
+  }, [cameraMode, status, flyToCurrentPose]);
 
   // "Palauta näkymä": kehystä nykyinen kameratila uudelleen satelliittiin.
   useEffect(() => {
@@ -364,9 +393,9 @@ function Globe3D({
     const Cesium = cesiumRef.current;
     const viewer = viewerRef.current;
     if (!Cesium || !viewer || viewer.isDestroyed() || !craftPosRef.current) return;
+    viewer.trackedEntity = undefined;
     viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
-    autoTrackRef.current = false;
-    lentoFollowRef.current = false;
+    autoOrbitRef.current = false;
     const positions = positionsRef.current;
     const routeSphere =
       positions.length >= 2
@@ -395,8 +424,10 @@ function Globe3D({
           easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT,
           complete: () => {
             if (viewer.isDestroyed()) return;
-            lentoFollowRef.current = true; // lukitse seuranta kunnes reset
-            autoTrackRef.current = true;
+            // Lukitse seuranta elokuvamaisesta loppukulmasta: satelliitti pysyy
+            // keskellä, käyttäjä saa pyörittää/zoomata vapaasti.
+            setCameraInputs(viewer.scene.screenSpaceCameraController, 'lento');
+            lockTracking(Cesium, viewer, craftPosRef.current, craftEntityRef.current);
           },
         });
       },
