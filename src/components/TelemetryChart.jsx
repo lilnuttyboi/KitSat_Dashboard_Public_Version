@@ -29,20 +29,35 @@ function XTick({ x, y, payload, index, visibleTicksCount }) {
   );
 }
 
-const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", domain, ticks, yDomain, yTicks, yScale = 1, yUnit, yDecimals = 2 }) => {
+const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", domain, ticks, yDomain, yTicks, yScale = 1, yUnit, yDecimals = 2, showAxisUnits = false }) => {
   // Kaavion arvoyksikkö voi poiketa päämittarista (ilmanpaine: hPa → kPa).
-  // Y-akselin leimat on piilotettu, joten yksikköä käytetään enää tooltipissa.
   const axisUnit = yUnit ?? unit;
+
+  // Y-akselin pykälät näytetään kaavion arvoyksikössä (jaetaan yScalella) ja
+  // pyöristetään turhia desimaalinollia karsien (esim. 2000.00 → 2000,
+  // 1022.80 → 1022.8). Näkyvät vain kun käyttäjä on kytkenyt asteikon päälle.
+  // Yksikkösymboleja ei näytetä akselilla (ne leikkautuisivat); yksikkö näkyy
+  // tooltipissa ja kortin pääarvossa.
+  const yTickFormatter = (v) => String(Number((v / yScale).toFixed(yDecimals)));
+
+  // Akselikaistan leveys mitoitetaan pisimmän pykälämerkkijonon mukaan, jottei
+  // esim. ilmanpaineen "1022.8" leikkaudu — ja kapeat kaaviot (esim. nopeus
+  // "1.5") eivät tuhlaa tilaa. Monospace ~9px/merkki + reunavarat.
+  const maxTickLen = yTicks && yTicks.length
+    ? yTicks.reduce((m, t) => Math.max(m, yTickFormatter(t).length), 0)
+    : 4;
+  const yAxisWidth = showAxisUnits ? Math.max(44, Math.round(maxTickLen * 9) + 14) : 0;
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <ResponsiveContainer width="100%" height="100%">
-        {/* Kaavio täyttää koko kortin leveyden: ei Y-akselin kaistaa, joten
-            viiva alkaa vasemmasta reunasta ja päättyy oikeaan (margin 0 molemmin
-            puolin). Y-akseli on piilotettu, mutta sen domain skaalaa viivan ja
-            sen pykälät asettavat vaaka-apuviivat. Reuna-aikaleimat tasataan
-            XTickissä sisäänpäin, etteivät ne leikkaudu. Apuviivojen värit
-            tulevat App.css:stä (--chart-grid). */}
+        {/* Kaavio täyttää oletuksena koko kortin leveyden: ei Y-akselin kaistaa,
+            joten viiva alkaa vasemmasta reunasta ja päättyy oikeaan (margin 0
+            molemmin puolin). Y-akselin domain skaalaa viivan ja sen pykälät
+            asettavat vaaka-apuviivat myös piilotettuna. Kun asteikko on päällä,
+            akseli näytetään oikealla (varaa oman kaistansa). Reuna-
+            aikaleimat tasataan XTickissä sisäänpäin, etteivät ne leikkaudu.
+            Apuviivojen värit tulevat App.css:stä (--chart-grid). */}
         <LineChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 36 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={true} />
           <XAxis
@@ -57,9 +72,15 @@ const TelemetryChart = memo(({ data, dataKey, unit, color = "var(--primary)", do
             tickLine={false}
           />
           <YAxis
+            orientation="right"
             domain={yDomain ?? ['auto', 'auto']}
             ticks={yTicks}
-            hide
+            hide={!showAxisUnits}
+            width={yAxisWidth}
+            tickFormatter={yTickFormatter}
+            tick={{ fill: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: 14 }}
+            tickLine={false}
+            axisLine={{ stroke: 'var(--border)' }}
           />
           <Tooltip
             labelStyle={{ color: 'var(--text-main)', fontWeight: 'bold', fontSize: '11px', marginBottom: '4px', fontFamily: 'var(--font-sans)' }}

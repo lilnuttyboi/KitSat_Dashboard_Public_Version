@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useTelemetry } from './hooks/useTelemetry';
 import LatestImage from './components/LatestImage';
 import FlightTimer from './components/FlightTimer';
 import MaintenanceOverlay from './components/MaintenanceOverlay';
-import { createControlChannel, readPersistedState, writePersistedState } from './lib/controlChannel';
+import ControlPanel from './components/ControlPanel';
+import { readPersistedState, writePersistedState } from './lib/controlState';
 import './App.css';
 
 // Lazy-ladataan raskaat riippuvuudet (leaflet, recharts) omiin chunkkeihinsa,
@@ -87,7 +88,7 @@ function buildRoute3d(history) {
 }
 
 // Mittarikortti: otsikko ikonilla, nykyarvo, valinnainen min/max-rivi ja kaavio.
-function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey, color, rangeMs, large = false, className, yUnit, yScale, yDecimals }) {
+function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey, color, rangeMs, large = false, className, yUnit, yScale, yDecimals, showAxisUnits }) {
   return (
     <div className={className ? `glass-card ${className}` : 'glass-card'}>
       <div className="metric-head">
@@ -101,7 +102,7 @@ function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey
       <p className={large ? 'value-large' : 'value-medium'}>
         {value?.toFixed(1) ?? '--'}<span className="unit">{unit}</span>
       </p>
-      <MetricChart history={history} dataKey={dataKey} unit={unit} color={color} rangeMs={rangeMs} yUnit={yUnit} yScale={yScale} yDecimals={yDecimals} />
+      <MetricChart history={history} dataKey={dataKey} unit={unit} color={color} rangeMs={rangeMs} yUnit={yUnit} yScale={yScale} yDecimals={yDecimals} showAxisUnits={showAxisUnits} />
     </div>
   );
 }
@@ -118,84 +119,19 @@ function App() {
   const [resetNonce, setResetNonce] = useState(0);       // bump -> Globe3D kehystää uudelleen
   const [flyoverNonce, setFlyoverNonce] = useState(0);   // bump -> Globe3D lentää reitin yli
   const [maintenance, setMaintenance] = useState(() => readPersistedState().maintenance); // huoltotila
-  const [controlConnected, setControlConnected] = useState(false); // onko ohjausikkuna kytketty
+  const [axisUnits, setAxisUnits] = useState(() => readPersistedState().axisUnits); // kaavioiden Y-akselin asteikko
+  const [controlOpen, setControlOpen] = useState(false); // onko asetuspaneeli auki (samassa välilehdessä)
 
-  // ── Ohjauskanava: erillinen #ohjaus-ikkuna ohjaa tätä koontinäyttöä ──────
-  // Koontinäyttö on tilan ainoa lähde: se soveltaa komennot ja lähettää
-  // tuoreimman tilan takaisin (nappien korostuksia varten).
-  const channelRef = useRef(null);
-  const stateRef = useRef(null);
-  if (stateRef.current === null) {
-    stateRef.current = { mapMode, basemap, cameraMode, maintenance, theme, range: rangeMs };
-  }
-  // Pidä viimeisin teemansetteri refissä, jottei mount-efektin (kanava) tarvitse
-  // riippua siitä — useTheme luo sen joka renderillä. Päivitys efektissä eikä
-  // renderissä (react-hooks/refs: refiä ei kirjoiteta renderin aikana).
-  const setThemeChoiceRef = useRef(setThemeChoice);
-  useEffect(() => {
-    setThemeChoiceRef.current = setThemeChoice;
-  });
-
-  useEffect(() => {
-    const channel = createControlChannel();
-    channelRef.current = channel;
-
-    const unsubscribe = channel.subscribe((msg) => {
-      if (!msg || typeof msg !== 'object') return;
-      if (msg.type === 'hello') {
-        setControlConnected(true);
-        channel.post({ type: 'state', state: stateRef.current });
-        return;
-      }
-      if (msg.type === 'bye') {
-        setControlConnected(false);
-        return;
-      }
-      if (msg.type === 'command') {
-        switch (msg.name) {
-          case 'setMapMode': setMapMode(msg.value); break;
-          case 'setBasemap': setBasemap(msg.value); break;
-          case 'setCameraMode': setCameraMode(msg.value); break;
-          case 'setMaintenance': setMaintenance(Boolean(msg.value)); break;
-          case 'setTheme': setThemeChoiceRef.current(msg.value === 'light' ? 'light' : 'dark'); break;
-          // Hyväksy vain kelvollinen aikaväli: null (MAX) tai äärellinen luku (ms).
-          case 'setRange': if (msg.value === null || Number.isFinite(msg.value)) setRangeMs(msg.value); break;
-          case 'reset': setResetNonce((n) => n + 1); break;
-          case 'lento': setFlyoverNonce((n) => n + 1); break;
-          default: break;
-        }
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      channel.close();
-      channelRef.current = null;
-    };
-  }, []);
-
-  // Lähetä tuorein tila ohjausikkunalle ja säilö se. Tämä efekti ajetaan myös
-  // mountissa → ennen koontinäyttöä avattu ohjausikkuna saa tilan heti.
-  // HUOM: snapshotin `theme` on vain PEILI ohjausikkunan korostusta varten;
-  // teeman varsinainen lähde on useTheme + localStorage('theme') (säilyttää
+  // Säilö säätötila localStorageen, jotta valinnat palautuvat sivun latauksessa.
+  // HUOM: `theme` säilötään myös tähän nappien korostusta varten, mutta teeman
+  // varsinainen lähde on useTheme + localStorage('theme') (säilyttää
   // käyttöjärjestelmäseurannan). Älä siemennä koontinäytön teemaa tästä tilasta.
   useEffect(() => {
-    const snapshot = { mapMode, basemap, cameraMode, maintenance, theme, range: rangeMs };
-    stateRef.current = snapshot;
-    writePersistedState(snapshot);
-    channelRef.current?.post({ type: 'state', state: snapshot });
-  }, [mapMode, basemap, cameraMode, maintenance, theme, rangeMs]);
+    writePersistedState({ mapMode, basemap, cameraMode, maintenance, theme, range: rangeMs, axisUnits });
+  }, [mapMode, basemap, cameraMode, maintenance, theme, rangeMs, axisUnits]);
+
   const route = useMemo(() => buildRoute(history), [history]);
   const route3d = useMemo(() => buildRoute3d(history), [history]);
-
-  // Avaa erillinen ohjausikkuna (#ohjaus). Sama toiminto yläpalkin ja
-  // huoltoruudun ratasnapeille.
-  const openControl = () =>
-    window.open(
-      `${window.location.origin}${window.location.pathname}#ohjaus`,
-      'kitsat-ohjaus',
-      'width=420,height=720'
-    );
 
   if (loading) {
     return <div className="loading">YHDISTETÄÄN OHJAUSKESKUKSEEN...</div>;
@@ -217,14 +153,13 @@ function App() {
           </div>
         </div>
         <div className="header-right">
-          {!controlConnected && !maintenance && (
+          {!controlOpen && !maintenance && (
             <button
               className="open-control-btn"
-              onClick={openControl}
-              aria-label="Avaa ohjaus erilliseen ikkunaan"
-              title="Avaa ohjaus erilliseen ikkunaan"
+              onClick={() => setControlOpen(true)}
+              title="Avaa asetukset"
             >
-              ⚙
+              Asetukset
             </button>
           )}
           <div className={`status-indicator ${status}`}>
@@ -250,6 +185,7 @@ function App() {
             dataKey="alt"
             color="#fbbf24"
             rangeMs={rangeMs}
+            showAxisUnits={axisUnits}
           />
 
           <div className="metrics-row left-metrics">
@@ -263,10 +199,10 @@ function App() {
               dataKey="temp"
               color="var(--accent)"
               rangeMs={rangeMs}
+              showAxisUnits={axisUnits}
             />
-            {/* Kaaviossa ilmanpaine näytetään kilopascaleina (1 kPa = 10 hPa),
-                jotta lukema on lyhyempi kuin hPa:na (esim. "100.78 kPa").
-                Päämittari pysyy hehtopascaleina. */}
+            {/* Ilmanpaineen kaavio ja asteikko käyttävät samaa yksikköä kuin
+                päämittari (hPa), jottei kPa/hPa-ero hämmennä katsojaa. */}
             <MetricCard
               title="Ilmanpaine"
               value={telemetry?.pressure_hpa}
@@ -275,9 +211,7 @@ function App() {
               dataKey="pressure"
               color="var(--success)"
               rangeMs={rangeMs}
-              yUnit="kPa"
-              yScale={10}
-              yDecimals={2}
+              showAxisUnits={axisUnits}
             />
           </div>
 
@@ -319,6 +253,7 @@ function App() {
               dataKey="speed"
               color="var(--error)"
               rangeMs={rangeMs}
+              showAxisUnits={axisUnits}
             />
             <div className="glass-card image-section">
               <h3 className="label">Viimeisin kuva</h3>
@@ -329,17 +264,39 @@ function App() {
       </main>
     </div>
     {maintenance && <MaintenanceOverlay />}
-    {/* Ratasnappi huoltoruudun PÄÄLLE: ainoa tapa avata ohjaus takaisin, kun
-        huoltotila peittää yläpalkin ratasnapin. Näkyy vain kun ohjaus ei ole auki. */}
-    {maintenance && !controlConnected && (
+    {/* Asetukset-nappi tietoja-ruudun PÄÄLLE: ainoa tapa avata paneeli takaisin,
+        kun ruutu peittää yläpalkin napin. Näkyy vain kun paneeli ei ole auki. */}
+    {maintenance && !controlOpen && (
       <button
         className="maintenance-launcher"
-        onClick={openControl}
-        aria-label="Avaa ohjaus erilliseen ikkunaan"
-        title="Avaa ohjaus erilliseen ikkunaan"
+        onClick={() => setControlOpen(true)}
+        title="Avaa asetukset"
       >
-        ⚙
+        Asetukset
       </button>
+    )}
+    {/* Kelluva asetuspaneeli samassa välilehdessä; pysyy auki kunnes suljetaan.
+        Renderöidään juuritasolla (z-index tietoja-ruudun yläpuolella). */}
+    {controlOpen && (
+      <ControlPanel
+        mapMode={mapMode}
+        onMapModeChange={setMapMode}
+        basemap={basemap}
+        onBasemapChange={setBasemap}
+        cameraMode={cameraMode}
+        onCameraModeChange={setCameraMode}
+        onReset={() => setResetNonce((n) => n + 1)}
+        onFlyover={() => setFlyoverNonce((n) => n + 1)}
+        maintenance={maintenance}
+        onMaintenanceToggle={() => setMaintenance((m) => !m)}
+        theme={theme}
+        onThemeChange={setThemeChoice}
+        range={rangeMs}
+        onRangeChange={setRangeMs}
+        axisUnits={axisUnits}
+        onAxisUnitsToggle={() => setAxisUnits((a) => !a)}
+        onClose={() => setControlOpen(false)}
+      />
     )}
     </>
   );

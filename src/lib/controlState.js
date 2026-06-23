@@ -1,8 +1,6 @@
-// Ohjausikkunan ja koontinäytön välinen viestikanava (sama kone, sama origin).
-// Käärii yhden BroadcastChannelin + localStorage-pysyvyyden. Tämä on ainoa
-// paikka joka tuntee viestiformaatin. Ei React-riippuvuutta → testattavissa.
+// Säätötilan pysyvyys (localStorage). Ainoa paikka joka tuntee tallennus-
+// formaatin. Ei React-riippuvuutta → testattavissa.
 
-const CHANNEL_NAME = 'kitsat-control';
 const STATE_KEY = 'kitsatControlState';
 
 // Oletustila — samat alkuarvot kuin koontinäytöllä (App.jsx).
@@ -13,6 +11,7 @@ const DEFAULT_STATE = {
   maintenance: false,
   theme: 'dark',        // 'dark' | 'light'
   range: 60000,         // kaavioiden aikaväli ms; null = MAX
+  axisUnits: false,     // näytä kaavioiden Y-akselin asteikko (arvot oikealla); oletus pois
 };
 
 // Lue pysyvä tila; palauta oletukset jos puuttuu tai viallinen.
@@ -34,22 +33,4 @@ export function writePersistedState(state) {
   } catch (e) {
     void e; // ei kriittistä
   }
-}
-
-// Luo viestikanava. Palauttaa pienen rajapinnan, joka piilottaa BroadcastChannelin.
-export function createControlChannel() {
-  const ch = new BroadcastChannel(CHANNEL_NAME);
-  return {
-    post(msg) {
-      ch.postMessage(msg);
-    },
-    subscribe(handler) {
-      const listener = (e) => handler(e.data);
-      ch.addEventListener('message', listener);
-      return () => ch.removeEventListener('message', listener);
-    },
-    close() {
-      ch.close();
-    },
-  };
 }

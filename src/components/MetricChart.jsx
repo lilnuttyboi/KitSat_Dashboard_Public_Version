@@ -60,7 +60,7 @@ function computeYAxis(data, key) {
   return { yDomain: [Number(lo.toFixed(6)), Number(hi.toFixed(6))], yTicks };
 }
 
-export default function MetricChart({ history, dataKey, unit, color, rangeMs, yUnit, yScale, yDecimals }) {
+export default function MetricChart({ history, dataKey, unit, color, rangeMs, yUnit, yScale, yDecimals, showAxisUnits }) {
   const { data, domain, ticks, yDomain, yTicks } = useMemo(() => {
     if (history.length === 0) return { data: history, domain: undefined, ticks: undefined, yDomain: undefined, yTicks: undefined };
     const firstMs = history[0].rawTimeMs;
@@ -94,7 +94,7 @@ export default function MetricChart({ history, dataKey, unit, color, rangeMs, yU
   return (
     <div className="metric-chart">
       <div className="metric-chart-canvas">
-        <TelemetryChart data={data} dataKey={dataKey} unit={unit} color={color} domain={domain} ticks={ticks} yDomain={yDomain} yTicks={yTicks} yScale={yScale} yUnit={yUnit} yDecimals={yDecimals} />
+        <TelemetryChart data={data} dataKey={dataKey} unit={unit} color={color} domain={domain} ticks={ticks} yDomain={yDomain} yTicks={yTicks} yScale={yScale} yUnit={yUnit} yDecimals={yDecimals} showAxisUnits={showAxisUnits} />
       </div>
     </div>
   );
