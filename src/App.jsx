@@ -69,7 +69,7 @@ function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey
 }
 
 function App() {
-  const { telemetry, history, loading, status, maxAlt, minTemp, maxSpeed, flightStartMs, lastDataMs } = useTelemetry();
+  const { telemetry, history, loading, error, status, maxAlt, minTemp, maxSpeed, flightStartMs, lastDataMs } = useTelemetry();
   const [rangeMs, setRangeMs] = useState(() => readPersistedState().range); // ms tai null (MAX)
   const theme = THEME; // yksi teema; välitetään kartoille tiilivalintaa varten
   // Säätötila siemennetään pysyvyydestä, jotta koontinäytön lataus palauttaa
@@ -98,6 +98,24 @@ function App() {
 
   if (loading) {
     return <div className="loading">YHDISTETÄÄN OHJAUSKESKUKSEEN...</div>;
+  }
+
+  // Alkulataus epäonnistui (verkko/Supabase) — näytetään selkeä virheilmoitus
+  // tyhjän "näyttää toimivalta mutta on kuollut" -koontinäytön sijaan. Jos
+  // realtime tuo dataa myöhemmin, markFresh nollaa virhetilan ja näkymä palautuu.
+  if (error) {
+    return (
+      <div className="loading">
+        <p>Yhteyttä ohjauskeskukseen ei saatu.</p>
+        <button
+          className="open-control-btn"
+          style={{ marginTop: '1rem' }}
+          onClick={() => window.location.reload()}
+        >
+          Yritä uudelleen
+        </button>
+      </div>
+    );
   }
 
   return (
