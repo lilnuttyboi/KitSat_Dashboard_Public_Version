@@ -283,7 +283,6 @@ export const useTelemetry = () => {
       channelSubscribedRef.current = true; // pollaus aktiivinen -> status voi mennä onlineksi
     })();
 
- Ahmeds-nuclear
     // Yksi pollauskierros: tunnista uusi lento, muuten hae vain uudet rivit.
     const pollOnce = async () => {
       if (cancelled || !initialLoaded || document.hidden) return;
@@ -316,29 +315,6 @@ export const useTelemetry = () => {
             lastSeenRef.current = r.created_at; // siirrä kursoria eteenpäin
             updateData(r);                      // uudelleenkäyttää kaiken siivouksen
           }
-
-    // Käytetään Realtime Broadcastia (kanta lähettää INSERTit tietokantatriggerillä)
-    // postgres_changes-tilauksen sijaan: kannan kuorma ei kasva katsojamäärän
-    // mukaan, koska Realtime-palvelin monistaa yhden viestin kaikille tilaajille.
-    // Kanavan nimen ('telemetry') ja eventin ('telemetry_insert') on täsmättävä
-    // tietokannan triggerin realtime.send(...)-kutsuun, tai rivit eivät tule perille.
-    const channel = supabase
-      .channel('telemetry')
-      .on('broadcast', { event: 'telemetry_insert' }, (msg) => {
-        if (DEV) console.log('Realtime update received');
-        const row = msg.payload; // triggerin jsonb_build_object(...) -hyötykuorma
-        if (!row) return;
-        if (!initialLoaded) pending.push(row);
-        else updateData(row);
-      })
-      .subscribe((s) => {
-        if (DEV) console.log('Realtime status:', s);
-        if (s === 'SUBSCRIBED') {
-          channelSubscribedRef.current = true;
-        } else {
-          channelSubscribedRef.current = false;
-          setStatus('offline');
- nuutti
         }
       } catch (e) {
         if (DEV) console.error('Poll error:', e);
