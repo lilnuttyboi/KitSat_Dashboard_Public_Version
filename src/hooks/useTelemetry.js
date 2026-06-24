@@ -277,17 +277,20 @@ export const useTelemetry = () => {
       pending.length = 0;
     })();
 
+    // Käytetään Realtime Broadcastia (kanta lähettää INSERTit tietokantatriggerillä)
+    // postgres_changes-tilauksen sijaan: kannan kuorma ei kasva katsojamäärän
+    // mukaan, koska Realtime-palvelin monistaa yhden viestin kaikille tilaajille.
+    // Kanavan nimen ('telemetry') ja eventin ('telemetry_insert') on täsmättävä
+    // tietokannan triggerin realtime.send(...)-kutsuun, tai rivit eivät tule perille.
     const channel = supabase
-      .channel('telemetry-updates')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: tableName },
-        (payload) => {
-          if (DEV) console.log('Realtime update received');
-          if (!initialLoaded) pending.push(payload.new);
-          else updateData(payload.new);
-        }
-      )
+      .channel('telemetry')
+      .on('broadcast', { event: 'telemetry_insert' }, (msg) => {
+        if (DEV) console.log('Realtime update received');
+        const row = msg.payload; // triggerin jsonb_build_object(...) -hyötykuorma
+        if (!row) return;
+        if (!initialLoaded) pending.push(row);
+        else updateData(row);
+      })
       .subscribe((s) => {
         if (DEV) console.log('Realtime status:', s);
         if (s === 'SUBSCRIBED') {
