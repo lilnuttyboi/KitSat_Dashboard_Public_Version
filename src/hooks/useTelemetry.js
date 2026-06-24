@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 const DEV = import.meta.env.DEV;
 const STALE_THRESHOLD_MS = 10_000;
 const FRESHNESS_CHECK_INTERVAL_MS = 2_000;
+const POLL_INTERVAL_MS = 3_000;          // live-pollauksen väli (REST, ei Realtimea)
 const HISTORY_BUFFER = 200000; // turvaraja live-puskurille; riittää koko ~4 h lennolle
 const FETCH_PAGE_SIZE = 1000;
 const INITIAL_LOAD_RETRIES = 3;          // alkulatauksen uudelleenyritykset ennen virhetilaa
@@ -111,6 +112,7 @@ export const useTelemetry = () => {
   const channelSubscribedRef = useRef(false);
   const currentFlightIdRef = useRef(null);
   const lastGoodCoordRef = useRef({ value: null }); // viimeisin uskottava sijainti
+  const lastSeenRef = useRef(null); // pollauskursori: viimeksi nähdyn rivin created_at
 
   const tableName = import.meta.env.VITE_SUPABASE_TABLE;
 
@@ -242,6 +244,7 @@ export const useTelemetry = () => {
         setMinTemp(clean.reduce((m, d) => observeMin(m, d.temp_c), null));
         setMaxSpeed(clean.reduce((m, d) => observeMax(m, d.gps_speed), null));
         const newestMs = new Date(newest.created_at).getTime();
+        lastSeenRef.current = newest.created_at; // pollaus jatkaa tästä eteenpäin
         lastReceivedAtRef.current = Date.now();
         setLastDataMs(newestMs);
         return 'ok';
@@ -251,13 +254,17 @@ export const useTelemetry = () => {
       }
     };
 
-    // Tilataan realtime heti (ei jää aukkoa), mutta puskuroidaan rivit kunnes
-    // alkulataus on valmis — muuten lataus voisi ylikirjoittaa kesken tulleen rivin.
+    // Live-päivitys POLLAUKSELLA (ei Realtimea): jokainen selain hakee uudet
+    // rivit REST-kyselyllä ~3 s välein. Tämä EI avaa Realtime-WebSocket-yhteyttä,
+    // joten 200+ katsojaa ei osu Realtimen kovien rajojen seinään (Free-plan:
+    // 200 yhtäaikaista yhteyttä / 100 viestiä/s). Vanha postgres_changes avasi
+    // yhden yhteyden PER katsoja ja monisti jokaisen rivin per katsoja → kaatui
+    // satojen katsojien kohdalla. Pollaus on vain kevyitä indeksoituja kyselyitä
+    // ((flight_id, created_at) -indeksi), joilla ei ole noita yhteys-/viestirajoja.
     let cancelled = false;
     let initialLoaded = false;
-    const pending = [];
 
-    // Yritetään alkulatausta muutaman kerran ennen virhetilan näyttämistä, jotta
+    // Alkulataus muutamalla yrityksellä ennen virhetilan näyttämistä, jotta
     // hetkellinen verkkokatko sivun avautuessa ei jätä koontinäyttöä tyhjäksi.
     (async () => {
       let result = 'error';
@@ -273,33 +280,53 @@ export const useTelemetry = () => {
       setError(result === 'error');
       setLoading(false);
       initialLoaded = true;
-      for (const row of pending) updateData(row);
-      pending.length = 0;
+      channelSubscribedRef.current = true; // pollaus aktiivinen -> status voi mennä onlineksi
     })();
 
-    // Käytetään Realtime Broadcastia (kanta lähettää INSERTit tietokantatriggerillä)
-    // postgres_changes-tilauksen sijaan: kannan kuorma ei kasva katsojamäärän
-    // mukaan, koska Realtime-palvelin monistaa yhden viestin kaikille tilaajille.
-    // Kanavan nimen ('telemetry') ja eventin ('telemetry_insert') on täsmättävä
-    // tietokannan triggerin realtime.send(...)-kutsuun, tai rivit eivät tule perille.
-    const channel = supabase
-      .channel('telemetry')
-      .on('broadcast', { event: 'telemetry_insert' }, (msg) => {
-        if (DEV) console.log('Realtime update received');
-        const row = msg.payload; // triggerin jsonb_build_object(...) -hyötykuorma
-        if (!row) return;
-        if (!initialLoaded) pending.push(row);
-        else updateData(row);
-      })
-      .subscribe((s) => {
-        if (DEV) console.log('Realtime status:', s);
-        if (s === 'SUBSCRIBED') {
-          channelSubscribedRef.current = true;
-        } else {
-          channelSubscribedRef.current = false;
-          setStatus('offline');
+    // Yksi pollauskierros: tunnista uusi lento, muuten hae vain uudet rivit.
+    const pollOnce = async () => {
+      if (cancelled || !initialLoaded || document.hidden) return;
+      const curId = currentFlightIdRef.current;
+      if (curId == null) return;
+      try {
+        // Uusi lento? Tarkista tuorein flight_id halvalla kyselyllä.
+        const { data: latest } = await supabase
+          .from(tableName)
+          .select('flight_id')
+          .not('flight_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (latest?.flight_id != null && latest.flight_id !== curId) {
+          await fetchInitialData(); // uusi lento -> lataa sen historia alusta
+          return;
         }
-      });
+        // Hae vain rivit jotka ovat uudempia kuin viimeksi nähty (kursori).
+        const { data: rows, error: pollErr } = await supabase
+          .from(tableName)
+          .select(TELEMETRY_COLUMNS)
+          .eq('flight_id', curId)
+          .gt('created_at', lastSeenRef.current)
+          .order('created_at', { ascending: true })
+          .limit(2000);
+        if (pollErr) { setStatus('offline'); return; }
+        if (rows && rows.length) {
+          for (const r of rows) {
+            lastSeenRef.current = r.created_at; // siirrä kursoria eteenpäin
+            updateData(r);                      // uudelleenkäyttää kaiken siivouksen
+          }
+        }
+      } catch (e) {
+        if (DEV) console.error('Poll error:', e);
+        setStatus('offline');
+      }
+    };
+
+    const pollTimer = setInterval(pollOnce, POLL_INTERVAL_MS);
+    // Pollaa heti kun välilehti palaa näkyviin (nopea jatko + säästää egressiä,
+    // koska piilossa oleva välilehti ei pollaa lainkaan).
+    const onVisible = () => { if (!document.hidden) pollOnce(); };
+    document.addEventListener('visibilitychange', onVisible);
 
     const freshnessTimer = setInterval(() => {
       const fresh = Date.now() - lastReceivedAtRef.current < STALE_THRESHOLD_MS;
@@ -309,8 +336,9 @@ export const useTelemetry = () => {
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      clearInterval(pollTimer);
       clearInterval(freshnessTimer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [tableName, updateData]);
 
