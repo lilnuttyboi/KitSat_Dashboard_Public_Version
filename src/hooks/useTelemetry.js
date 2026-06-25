@@ -52,6 +52,7 @@ export const useTelemetry = () => {
 
   const lastReceivedAtRef = useRef(0);       // selainaika: viimeisin datan saapuminen
   const currentFlightIdRef = useRef(null);
+  const newestMsRef = useRef(-Infinity);     // uusimman sulautetun rivin aikaleima (dedup)
 
   useEffect(() => {
     let cancelled = false;
@@ -82,9 +83,11 @@ export const useTelemetry = () => {
       setMaxAlt(rows.reduce((m, d) => observeMax(m, d.gps_alt), null));
       setMinTemp(rows.reduce((m, d) => observeMin(m, d.temp_c), null));
       setMaxSpeed(rows.reduce((m, d) => observeMax(m, d.gps_speed), null));
+      const newestMs = rows.length ? new Date(rows[rows.length - 1].created_at).getTime() : -Infinity;
+      newestMsRef.current = newestMs;
       if (rows.length) {
         lastReceivedAtRef.current = Date.now();
-        setLastDataMs(new Date(rows[rows.length - 1].created_at).getTime());
+        setLastDataMs(newestMs);
       }
     };
 
@@ -111,16 +114,18 @@ export const useTelemetry = () => {
         reloadHistory();
         return;
       }
+      const ms = new Date(row.created_at).getTime();
       if (curId == null) {
         currentFlightIdRef.current = newId;
-        setFlightStartMs(new Date(row.created_at).getTime());
+        setFlightStartMs(ms);
       }
-      setTelemetry((prev) => (prev?.created_at === row.created_at ? prev : row));
-      setHistory((prev) => {
-        const entry = toHistoryEntry(row);
-        if (prev.length && prev[prev.length - 1].rawTimeMs === entry.rawTimeMs) return prev;
-        return [...prev, entry].slice(-HISTORY_BUFFER);
-      });
+      // /api/latest palauttaa aina ~60 viimeistä riviä, joista valtaosa on jo
+      // historiassa. Sulautetaan VAIN aidosti uudemmat rivit (ms > uusin nähty),
+      // muuten sama ikkuna liimautuisi historiaan joka pollissa -> tuplaviivat.
+      if (!(ms > newestMsRef.current)) return;
+      newestMsRef.current = ms;
+      setTelemetry(row);
+      setHistory((prev) => [...prev, toHistoryEntry(row)].slice(-HISTORY_BUFFER));
       setMaxAlt((prev) => observeMax(prev, row.gps_alt));
       setMinTemp((prev) => observeMin(prev, row.temp_c));
       setMaxSpeed((prev) => observeMax(prev, row.gps_speed));
