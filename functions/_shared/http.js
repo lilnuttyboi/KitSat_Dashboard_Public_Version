@@ -30,7 +30,15 @@ export async function serveCached(context, buildFn, maxAge) {
   return res;
 }
 
-// Lukee Supabase-asetukset Pages-ympäristömuuttujista.
+// Lukee Supabase-asetukset Pages-ympäristömuuttujista. Käyttää ensisijaisesti
+// palvelinpuolen nimiä (SUPABASE_*), mutta putoaa takaisin vanhan frontendin
+// VITE_*-muuttujiin — ne ovat jo Pages-projektissa (build tarvitsi niitä), joten
+// deploy ei vaadi uusia avaimia Cloudflareen.
 export function cfgFromEnv(env) {
-  return { url: env.SUPABASE_URL, anonKey: env.SUPABASE_ANON_KEY, table: env.SUPABASE_TABLE, bucket: 'camera' };
+  return {
+    url: env.SUPABASE_URL ?? env.VITE_SUPABASE_URL,
+    anonKey: env.SUPABASE_ANON_KEY ?? env.VITE_SUPABASE_ANON_KEY,
+    table: env.SUPABASE_TABLE ?? env.VITE_SUPABASE_TABLE,
+    bucket: 'camera',
+  };
 }
