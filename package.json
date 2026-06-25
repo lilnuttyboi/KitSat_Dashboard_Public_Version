@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "check": "node functions/_shared/clean.check.mjs",
+    "check": "node functions/_shared/clean.check.mjs && node functions/_shared/snapshot.check.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
