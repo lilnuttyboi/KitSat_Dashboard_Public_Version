@@ -34,4 +34,29 @@ const imageUrl = await fetchLatestImageUrl(cfg);
 console.log('imageUrl:', imageUrl);
 assert.ok(imageUrl === null || imageUrl.startsWith('https://'), 'image url is https or null');
 
+// --- Handler-taso: stubataan caches + ctx, ajetaan oikeat onRequestGet:t ---
+globalThis.caches = { default: { match: async () => undefined, put: async () => {} } };
+
+const env = { SUPABASE_URL: cfg.url, SUPABASE_ANON_KEY: cfg.anonKey, SUPABASE_TABLE: cfg.table };
+const ctx = (path) => ({ env, request: new Request(`https://example.test${path}`), waitUntil() {} });
+
+const { onRequestGet: history } = await import('../api/history.js');
+const hRes = await history(ctx('/api/history'));
+assert.equal(hRes.status, 200, 'history 200');
+assert.match(hRes.headers.get('cache-control'), /s-maxage=30/, 'history cache 30s');
+const hBody = await hRes.json();
+assert.ok(Array.isArray(hBody.rows), 'history rows array');
+console.log('history handler rows:', hBody.rows.length);
+
+const { onRequestGet: latest } = await import('../api/latest.js');
+const lRes = await latest(ctx('/api/latest'));
+assert.equal(lRes.status, 200, 'latest 200');
+assert.match(lRes.headers.get('cache-control'), /s-maxage=3/, 'latest cache 3s');
+const lBody = await lRes.json();
+assert.ok(Array.isArray(lBody.rows), 'latest rows array');
+assert.ok(lBody.imageUrl === null || lBody.imageUrl.startsWith('https://'), 'latest imageUrl');
+console.log('latest handler rows:', lBody.rows.length, 'image:', lBody.imageUrl);
+
+console.log('handlers OK');
+
 console.log('functions.smoke.mjs OK');
