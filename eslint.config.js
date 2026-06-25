@@ -18,4 +18,14 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    files: ['functions/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.serviceworker, ...globals.node },
+    },
+    rules: {
+      // Pages Functions vievät onRequestGet:n, ei React-komponentteja.
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])
