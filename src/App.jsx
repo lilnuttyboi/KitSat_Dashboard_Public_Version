@@ -70,7 +70,7 @@ function MetricCard({ title, value, unit, metaLabel, metaValue, history, dataKey
 }
 
 function App() {
-  const { telemetry, history, loading, error, status, maxAlt, minTemp, maxSpeed, flightStartMs, lastDataMs } = useTelemetry();
+  const { telemetry, history, loading, error, status, maxAlt, minTemp, maxSpeed, flightStartMs, lastDataMs, imageUrl } = useTelemetry();
   const [rangeMs, setRangeMs] = useState(() => readPersistedState().range); // ms tai null (MAX)
   const theme = THEME; // yksi teema; välitetään kartoille tiilivalintaa varten
   // Säätötila siemennetään pysyvyydestä, jotta koontinäytön lataus palauttaa
@@ -244,7 +244,7 @@ function App() {
             />
             <div className="glass-card image-section">
               <h3 className="label">Viimeisin kuva</h3>
-              <LatestImage />
+              <LatestImage imageUrl={imageUrl} loading={loading} />
             </div>
           </div>
         </Suspense>
